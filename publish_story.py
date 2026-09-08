@@ -57,15 +57,26 @@ def generate_ai_title(original_title):
         return original_title
 
 def fetch_all_valid_products():
-    """Obtiene todos los productos con precio válido desde WooCommerce."""
+    """Obtiene todos los productos validando estrictamente que tengan precio real y no datos cacheados."""
     endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache"
+    }
     
     valid_products = []
     page = 1
     
     while True:
-        res = requests.get(endpoint, params={"per_page": 50, "page": page}, headers=headers, timeout=15)
+        # Añadimos un parámetro nocache para forzar a WooCommerce a saltearse la caché de la API
+        params = {
+            "per_page": 50,
+            "page": page,
+            "_nocache": int(time.time())
+        }
+        
+        res = requests.get(endpoint, params=params, headers=headers, timeout=15)
         if res.status_code != 200 or not res.json():
             break
             
@@ -77,15 +88,30 @@ def fetch_all_valid_products():
             images = product.get("images", [])
             if not images:
                 continue
-                
-            prices_info = product.get("prices", {})
-            raw_price = prices_info.get("price", "0")
             
+            # Chequeo de stock
+            stock_status = product.get("stock_status", "")
+            is_in_stock = product.get("is_in_stock", True)
+            if stock_status == "outofstock" or not is_in_stock:
+                continue
+
+            prices_info = product.get("prices", {})
+            raw_price = prices_info.get("price")
+            
+            # Verificación estricta: No None, no vacío, no "0"
+            if raw_price is None or str(raw_price).strip() in ["", "0", "null"]:
+                continue
+                
             if not str(raw_price).isdigit() or int(raw_price) <= 0:
                 continue
                 
             val_num = int(raw_price)
             val_final = val_num / 100
+            
+            # Si el valor resultante es 0 o menor, descartar
+            if val_final <= 0:
+                continue
+
             formatted_price = f"${val_final:,.0f}".replace(",", ".")
             
             valid_products.append({
@@ -99,7 +125,7 @@ def fetch_all_valid_products():
 
     print(f"Se encontraron {len(valid_products)} productos con precio válido.")
     return valid_products
-
+    
 def draw_vertical_gradient(draw_obj, rect, color_top, color_bottom):
     """Dibuja un degradado vertical suave."""
     x1, y1, x2, y2 = rect
