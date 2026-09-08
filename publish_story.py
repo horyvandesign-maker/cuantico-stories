@@ -57,8 +57,10 @@ def generate_ai_title(original_title):
         print(f"Fallback a título original por error en IA: {e}")
         return original_title
 
+import re
+
 def get_product_and_image():
-    """Consulta WooCommerce, detecta si es por encargo/reserva y descarga la imagen con el precio final correcto."""
+    """Consulta WooCommerce, descarga la imagen y extrae el precio exacto directo del HTML si la API falla."""
     endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     
@@ -76,41 +78,52 @@ def get_product_and_image():
             continue
             
         img_url = images[0].get("src", "")
+        permalink = product.get("permalink", "")
+        
         try:
             img_res = requests.get(img_url, headers=headers, timeout=10)
             if img_res.status_code == 200:
                 img_orig = Image.open(BytesIO(img_res.content)).convert("RGB")
                 
-                # Validación de stock / reservas / encargo
+                # 1. Chequeo de reserva / encargo
                 is_on_backorder = product.get("is_on_backorder", False)
                 stock_status = product.get("stock_status", "")
                 
-                prices_dict = product.get("prices", {})
-                
-                # En wc/store/v1, prices.price contiene el valor en la unidad menor (centavos/minor units)
-                # Si hay precio de oferta (sale_price), se prioriza ese sobre el precio regular.
-                raw_val = prices_dict.get("price")
-                
                 is_on_demand = False
                 
-                if is_on_backorder or stock_status == "onbackorder" or not raw_val or str(raw_val) == "0":
+                if is_on_backorder or stock_status == "onbackorder":
                     is_on_demand = True
                     price = "¡DISPONIBLE POR ENCARGO!"
                 else:
-                    try:
-                        # Extraer el valor numérico
-                        val_num = int(raw_val)
-                        # La API de Store usa los decimales configurados en WooCommerce (por defecto 2 decimales -> dividir por 100)
-                        decimals = int(prices_dict.get("currency_minor_units", 2))
-                        if decimals > 0:
-                            val_final = val_num / (10 ** decimals)
+                    # 2. Scrapear el precio exacto directo de la página del producto para evitar desfases de plugins/API
+                    price = None
+                    if permalink:
+                        try:
+                            p_res = requests.get(permalink, headers=headers, timeout=10)
+                            if p_res.status_code == 200:
+                                # Busca el patrón del precio exacto en el HTML (ej: <span class="woocommerce-Price-amount amount"><bdi><span>$</span>2.280.000,00</bdi></span>)
+                                matches = re.findall(r'woocommerce-Price-amount[^>]*>.*?\$?\s*([\d\.]+)(?:,\d{2})?', p_res.text, re.DOTALL)
+                                if matches:
+                                    # Limpia y toma el valor numérico formateado
+                                    raw_price_str = matches[0].strip().replace('.', '')
+                                    if raw_price_str.isdigit() and int(raw_price_str) > 0:
+                                        val_num = int(raw_price_str)
+                                        price = f"${val_num:,.0f}".replace(",", ".")
+                        except Exception as e:
+                            print(f"Error parseando página web: {e}")
+
+                    # Fallback si el scraping no encontró o falló
+                    if not price:
+                        price_raw = product.get("prices", {}).get("price", "0")
+                        if not str(price_raw).isdigit() or int(price_raw) == 0:
+                            is_on_demand = True
+                            price = "¡DISPONIBLE POR ENCARGO!"
                         else:
-                            val_final = float(val_num)
-                        
-                        price = f"${val_final:,.0f}".replace(",", ".")
-                    except Exception:
-                        price = "¡DISPONIBLE POR ENCARGO!"
-                        is_on_demand = True
+                            val_num = int(price_raw)
+                            # Si viene en centavos
+                            if val_num > 1000000:
+                                val_num = val_num // 100
+                            price = f"${val_num:,.0f}".replace(",", ".")
                 
                 raw_name = clean_text(product.get("name", "Producto Cuantico"))
                 ai_name = generate_ai_title(raw_name)
@@ -128,7 +141,7 @@ def get_product_and_image():
 
     print("No se encontró ningún producto con imagen procesable.")
     exit(1)
-    
+        
 def create_story_template(product):
     """Genera la plantilla visual de 1080x1920 px con encuadre, fuentes e IA."""
     canvas_w, canvas_h = 1080, 1920
