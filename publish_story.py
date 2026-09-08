@@ -20,9 +20,8 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 SITE_URL = "https://cuanticopc.com.ar"
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
-# Paleta de colores neón y etiquetas dinámicas
-ACCENT_COLORS = ["#00FF88", "#00E5FF", "#B000FF", "#FF007F"]
-HEADER_TAGS = ["NUEVO INGRESO", "OFERTA DESTACADA", "STOCK DISPONIBLE", "EQUIPO GAMER"]
+# Paleta de colores dinámicos
+ACCENT_COLORS = ["#00FF88", "#00E5FF", "#B000FF"]
 
 def get_font(size):
     """Obtiene una tipografía vectorial escalable preinstalada en Linux."""
@@ -141,85 +140,30 @@ def draw_vertical_gradient(draw_obj, rect, color_top, color_bottom):
         a = int(color_top[3] * (1 - ratio) + color_bottom[3] * ratio)
         draw_obj.line([(x1, y1 + i), (x2, y1 + i)], fill=(r, g, b, a))
 
-def draw_cyber_grid(draw_obj, rect):
-    """Dibuja una cuadrícula synthwave/cyberpunk dinámica en la parte inferior."""
-    x1, y1, x2, y2 = rect
-    grid_color = (138, 43, 226, random.randint(40, 80))
-    
-    # Líneas horizontales con perspectiva
-    for i in range(0, 200, random.choice([20, 25, 30])):
-        draw_obj.line([(x1, y1 + i), (x2, y1 + i)], fill=grid_color, width=1)
-        
-    # Líneas perspectiva diagonales
-    center_x = (x1 + x2) // 2
-    step = random.choice([70, 80, 90])
-    for offset in range(-600, 700, step):
-        draw_obj.line([(center_x + offset // 3, y1), (center_x + offset, y2)], fill=grid_color, width=1)
-
-def draw_geometric_polygons(draw_obj, side="right", accent_hex="#00E5FF"):
-    """Dibuja mallas poligonales 3D vectoriales dinámicas en los bordes."""
-    # Convertir Hex a RGB
-    h = accent_hex.lstrip('#')
-    rgb = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
-    line_color = (rgb[0], rgb[1], rgb[2], 120)
-    
-    base_x = 900 if side == "right" else 180
-    dir_x = 1 if side == "right" else -1
-    
-    # Variación aleatoria suave de vértices
-    v = random.randint(-15, 15)
-    nodes = [
-        (base_x, 600 + v), (base_x + dir_x*120, 520 + v), (base_x + dir_x*150, 680 + v),
-        (base_x + dir_x*50, 780 + v), (base_x - dir_x*80, 700 + v),
-        (base_x + dir_x*110, 850 + v), (base_x + dir_x*160, 980 + v), (base_x + dir_x*20, 1050 + v)
-    ]
-    
-    triangles = [
-        (0,1,2), (0,2,3), (0,3,4), (2,3,5), (2,5,6), (3,5,7)
-    ]
-    
-    for t in triangles:
-        p1, p2, p3 = nodes[t[0]], nodes[t[1]], nodes[t[2]]
-        draw_obj.polygon([p1, p2, p3], outline=line_color, width=2)
-
 def create_story_template(product, img_obj):
-    """Genera la plantilla con estructura fija pero elementos vectoriales infinitos y dinámicos."""
+    """Genera la plantilla con dinamismo y logo agrandado."""
     canvas_w, canvas_h = 1080, 1920
+    
     accent_color = random.choice(ACCENT_COLORS)
-    header_text = random.choice(HEADER_TAGS)
     
-    # 1. Fondo base degradado Púrpura/Azul Oscuro Cyberpunk
-    bg = Image.new("RGBA", (canvas_w, canvas_h), (10, 8, 20, 255))
-    g_layer = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
-    g_draw = ImageDraw.Draw(g_layer)
-    draw_vertical_gradient(g_draw, (0, 0, canvas_w, canvas_h), (18, 12, 38, 255), (6, 5, 15, 255))
-    bg.paste(g_layer, (0, 0), g_layer)
+    # 1. Fondo difuminado
+    bg = img_obj.resize((canvas_w, canvas_h)).filter(ImageFilter.GaussianBlur(50))
+    overlay = Image.new("RGBA", (canvas_w, canvas_h), (12, 12, 18, 160))
+    bg.paste(overlay, (0, 0), overlay)
     
-    # 2. Renderizar polígonos y mallas synthwave vectoriales
-    cyber_draw = ImageDraw.Draw(bg)
-    draw_cyber_grid(cyber_draw, (0, canvas_h - 250, canvas_w, canvas_h))
+    # 2. Gradientes de sombra
+    gradient_layer = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+    g_draw = ImageDraw.Draw(gradient_layer)
+    draw_vertical_gradient(g_draw, (0, 0, canvas_w, 350), (0, 0, 0, 210), (0, 0, 0, 0))
+    draw_vertical_gradient(g_draw, (0, canvas_h - 350, canvas_w, canvas_h), (0, 0, 0, 0), (0, 0, 0, 230))
+    bg.paste(gradient_layer, (0, 0), gradient_layer)
     
-    # Decidir de qué lado renderizar los polígonos
-    polygon_side = random.choice(["right", "left", "both"])
-    if polygon_side in ["right", "both"]:
-        draw_geometric_polygons(cyber_draw, side="right", accent_hex=accent_color)
-    if polygon_side in ["left", "both"]:
-        draw_geometric_polygons(cyber_draw, side="left", accent_hex=accent_color)
-    
-    # 3. Marqueza superior dinámica
-    font_header = get_font(34)
-    cyber_draw.text((70, 65), header_text, fill="#FFFFFF", font=font_header)
-    
-    # Franjas decorativas neón superiores
-    cyber_draw.polygon([(950, 55), (980, 55), (940, 105), (910, 105)], fill="#B000FF")
-    cyber_draw.polygon([(1000, 55), (1030, 55), (990, 105), (960, 105)], fill=accent_color)
-    
-    # 4. Tarjeta contenedor limpia para la foto del producto
+    # 3. Tarjeta para el producto
     card_w, card_h = 860, 860
     card_x = (canvas_w - card_w) // 2
-    card_y = 400
+    card_y = 420
     
-    card_bg = Image.new("RGBA", (card_w, card_h), (255, 255, 255, 245))
+    card_bg = Image.new("RGBA", (card_w, card_h), (255, 255, 255, 240))
     card_mask = Image.new("L", (card_w, card_h), 0)
     card_mask_draw = ImageDraw.Draw(card_mask)
     card_mask_draw.rounded_rectangle((0, 0, card_w, card_h), radius=35, fill=255)
@@ -235,12 +179,13 @@ def create_story_template(product, img_obj):
     
     draw = ImageDraw.Draw(bg)
     
-    # 5. Render del Logo Agrandado y Posición Aleatoria
+    # 4. Render del Logo Agrandado con Posición Aleatoria
     logo_path = os.path.join(os.path.dirname(__file__), "logo_canva.png")
     
     if os.path.exists(logo_path):
         try:
             logo_img = Image.open(logo_path).convert("RGBA")
+            # Redimensionado más grande
             logo_img.thumbnail((550, 220))
             l_w, l_h = logo_img.size
             
@@ -254,14 +199,15 @@ def create_story_template(product, img_obj):
             else:
                 logo_x = (canvas_w - l_w) // 2
                 
-            logo_y = 135
+            logo_y = 110
             bg.paste(logo_img, (logo_x, logo_y), logo_img)
         except Exception as e:
-            draw.text((canvas_w // 2, 165), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
+            print(f"Error procesando el logo: {e}")
+            draw.text((canvas_w // 2, 160), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
     else:
-        draw.text((canvas_w // 2, 165), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
+        draw.text((canvas_w // 2, 160), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
     
-    # 6. Título del producto
+    # 5. Título del producto
     font_title = get_font(42)
     wrapped_lines = textwrap.wrap(product["ai_name"], width=22)
     wrapped_text = "\n".join(wrapped_lines[:3])
@@ -276,7 +222,7 @@ def create_story_template(product, img_obj):
         align="center"
     )
     
-    # 7. Cápsula de precio Neón con borde dinámico
+    # 6. Cápsula del precio
     font_price = get_font(58)
     price_str = product["price"]
     
@@ -297,11 +243,9 @@ def create_story_template(product, img_obj):
     draw.rounded_rectangle((badge_x1, badge_y1, badge_x2, badge_y2), radius=25, fill=(18, 22, 28, 240), outline=accent_color, width=3)
     draw.text(((badge_x1 + badge_x2) // 2, (badge_y1 + badge_y2) // 2 - 3), price_str, fill=accent_color, font=font_price, anchor="mm")
     
-    # 8. Pie de página comercial Gamer
-    font_footer_sub = get_font(26)
-    font_footer_main = get_font(32)
-    draw.text((70, canvas_h - 100), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", fill="#AAAAAA", font=font_footer_sub)
-    draw.text((70, canvas_h - 60), "@CUANTICOPC", fill="#FFFFFF", font=font_footer_main)
+    # 7. Marca de agua inferior
+    font_footer = get_font(38)
+    draw.text((canvas_w // 2, canvas_h - 140), "cuanticopc.com.ar", fill="#DDDDDD", font=font_footer, anchor="mm")
     
     output_path = f"story_{product['id']}.jpg"
     bg.save(output_path, "JPEG", quality=95)
