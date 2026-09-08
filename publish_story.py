@@ -22,6 +22,28 @@ bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
 # Paleta de colores dinámicos
 ACCENT_COLORS = ["#00FF88", "#00E5FF", "#B000FF"]
+ON_DEMAND_COLOR = "#FFB703" # Color dorado/ámbar para productos por encargue
+
+# Variable global para capturar la respuesta del usuario sin duplicar handlers
+user_choice = {"action": None}
+
+@bot.callback_query_handler(func=lambda call: True)
+def global_callback_listener(call):
+    """Maneja las interacciones de los botones de forma global."""
+    if call.data.startswith("approve_"):
+        user_choice["action"] = "approve"
+        bot.answer_callback_query(call.id, "Publicando...")
+        bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption="🚀 *Publicando en Instagram Stories...*", parse_mode="Markdown")
+    elif call.data.startswith("skip_"):
+        user_choice["action"] = "skip"
+        bot.answer_callback_query(call.id, "Salteado.")
+        bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption="⏭️ *Producto salteado.*", parse_mode="Markdown")
+    elif call.data == "stop":
+        user_choice["action"] = "stop"
+        bot.answer_callback_query(call.id, "Deteniendo proceso...")
+        bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption="🛑 *Proceso detenido.*", parse_mode="Markdown")
+    
+    bot.stop_polling()
 
 def get_font(size):
     """Obtiene una tipografía vectorial escalable preinstalada en Linux."""
@@ -61,7 +83,7 @@ def generate_ai_title(original_title):
         return original_title
 
 def fetch_all_valid_products():
-    """Obtiene todos los productos validando de forma estricta stock y precio directo sin caché."""
+    """Obtiene todos los productos y determina si van con precio normal o 'POR ENCARGUE'."""
     endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
@@ -91,41 +113,45 @@ def fetch_all_valid_products():
             images = product.get("images", [])
             if not images:
                 continue
-            
-            # Verificación de stock
+
+            status = product.get("status", "publish")
             stock_status = product.get("stock_status", "")
             is_in_stock = product.get("is_in_stock", True)
-            if stock_status == "outofstock" or not is_in_stock:
-                continue
-
+            backorders_allowed = product.get("backorders_allowed", False) or product.get("permalink", "")
+            
             prices_info = product.get("prices", {})
             raw_price = prices_info.get("price")
             
-            # Filtrar si no hay precio cargado
-            if raw_price is None or str(raw_price).strip() in ["", "0", "null"]:
-                continue
-                
-            if not str(raw_price).isdigit() or int(raw_price) <= 0:
-                continue
-                
-            val_num = int(raw_price)
-            val_final = val_num / 100
+            # Criterio para detectar si debe ser "POR ENCARGUE"
+            is_on_demand = False
             
-            if val_final <= 0:
-                continue
+            # 1. Si está pausado/borrador, o sin stock pero se puede reservar
+            if status != "publish" or stock_status == "outofstock" or not is_in_stock:
+                is_on_demand = True
+            
+            # 2. Validar precio
+            formatted_price = "POR ENCARGUE"
+            if not is_on_demand and raw_price and str(raw_price).isdigit() and int(raw_price) > 0:
+                val_num = int(raw_price)
+                val_final = val_num / 100
+                if val_final > 0:
+                    formatted_price = f"${val_final:,.0f}".replace(",", ".")
+                else:
+                    is_on_demand = True
+            else:
+                is_on_demand = True
 
-            formatted_price = f"${val_final:,.0f}".replace(",", ".")
-            
             valid_products.append({
                 "id": product.get("id"),
                 "original_name": clean_text(product.get("name", "Producto Cuantico")),
                 "price": formatted_price,
+                "is_on_demand": is_on_demand,
                 "raw_url": images[0].get("src", "")
             })
             
         page += 1
 
-    print(f"Se encontraron {len(valid_products)} productos con precio y stock válidos.")
+    print(f"Se encontraron {len(valid_products)} productos procesables.")
     return valid_products
 
 def draw_vertical_gradient(draw_obj, rect, color_top, color_bottom):
@@ -141,10 +167,16 @@ def draw_vertical_gradient(draw_obj, rect, color_top, color_bottom):
         draw_obj.line([(x1, y1 + i), (x2, y1 + i)], fill=(r, g, b, a))
 
 def create_story_template(product, img_obj):
-    """Genera la plantilla con dinamismo y logo agrandado."""
+    """Genera la plantilla adaptando la cápsula según si tiene precio publicado o es por encargue."""
     canvas_w, canvas_h = 1080, 1920
     
-    accent_color = random.choice(ACCENT_COLORS)
+    # Selecciona color de acento según disponibilidad
+    if product["is_on_demand"]:
+        accent_color = ON_DEMAND_COLOR
+        display_label = "📦 PRODUCTO POR ENCARGUE"
+    else:
+        accent_color = random.choice(ACCENT_COLORS)
+        display_label = product["price"]
     
     # 1. Fondo difuminado
     bg = img_obj.resize((canvas_w, canvas_h)).filter(ImageFilter.GaussianBlur(50))
@@ -179,13 +211,12 @@ def create_story_template(product, img_obj):
     
     draw = ImageDraw.Draw(bg)
     
-    # 4. Render del Logo Agrandado con Posición Aleatoria
+    # 4. Render del Logo
     logo_path = os.path.join(os.path.dirname(__file__), "logo_canva.png")
     
     if os.path.exists(logo_path):
         try:
             logo_img = Image.open(logo_path).convert("RGBA")
-            # Redimensionado más grande
             logo_img.thumbnail((550, 220))
             l_w, l_h = logo_img.size
             
@@ -222,15 +253,15 @@ def create_story_template(product, img_obj):
         align="center"
     )
     
-    # 6. Cápsula del precio
-    font_price = get_font(58)
-    price_str = product["price"]
+    # 6. Cápsula del Precio / Por Encargue
+    font_size = 46 if product["is_on_demand"] else 58
+    font_badge = get_font(font_size)
     
-    bbox = draw.textbbox((0, 0), price_str, font=font_price)
+    bbox = draw.textbbox((0, 0), display_label, font=font_badge)
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
     
-    badge_padding_x = 55
+    badge_padding_x = 50
     badge_padding_y = 25
     badge_w = text_w + (badge_padding_x * 2)
     badge_h = text_h + (badge_padding_y * 2)
@@ -241,7 +272,7 @@ def create_story_template(product, img_obj):
     badge_y2 = badge_y1 + badge_h
     
     draw.rounded_rectangle((badge_x1, badge_y1, badge_x2, badge_y2), radius=25, fill=(18, 22, 28, 240), outline=accent_color, width=3)
-    draw.text(((badge_x1 + badge_x2) // 2, (badge_y1 + badge_y2) // 2 - 3), price_str, fill=accent_color, font=font_price, anchor="mm")
+    draw.text(((badge_x1 + badge_x2) // 2, (badge_y1 + badge_y2) // 2 - 3), display_label, fill=accent_color, font=font_badge, anchor="mm")
     
     # 7. Marca de agua inferior
     font_footer = get_font(38)
@@ -286,13 +317,13 @@ def process_catalog():
     """Recorre la lista de productos pidiendo aprobación interactiva en Telegram."""
     products = fetch_all_valid_products()
     if not products:
-        bot.send_message(TELEGRAM_CHAT_ID, "❌ No se encontraron productos válidos para publicar.")
+        bot.send_message(TELEGRAM_CHAT_ID, "❌ No se encontraron productos para procesar.")
         return
 
     headers = {"User-Agent": "Mozilla/5.0"}
     total = len(products)
     
-    bot.send_message(TELEGRAM_CHAT_ID, f"🚀 *Iniciando revisión de catálogo completo* ({total} productos encontrados).", parse_mode="Markdown")
+    bot.send_message(TELEGRAM_CHAT_ID, f"🚀 *Iniciando revisión de catálogo completo* ({total} productos).", parse_mode="Markdown")
 
     for index, prod in enumerate(products, start=1):
         try:
@@ -312,34 +343,18 @@ def process_catalog():
                 InlineKeyboardButton("🛑 Detener", callback_data="stop")
             )
             
+            type_str = "📦 POR ENCARGUE" if prod["is_on_demand"] else f"💰 {prod['price']}"
             caption = (
                 f"📦 *[{index}/{total}] {prod['original_name']}*\n"
-                f"💰 Precio: {prod['price']}\n\n"
+                f"Estado: *{type_str}*\n\n"
                 f"¿Publicar esta Story?"
             )
             
             with open(image_path, "rb") as photo:
                 msg = bot.send_photo(TELEGRAM_CHAT_ID, photo, caption=caption, reply_markup=markup, parse_mode="Markdown")
                 
-            user_choice = {"action": None}
+            user_choice["action"] = None
             
-            @bot.callback_query_handler(func=lambda call: True)
-            def callback_listener(call):
-                if call.data.startswith("approve_"):
-                    user_choice["action"] = "approve"
-                    bot.answer_callback_query(call.id, "Publicando...")
-                    bot.edit_message_caption(chat_id=TELEGRAM_CHAT_ID, message_id=msg.message_id, caption="🚀 *Publicando en Instagram Stories...*", parse_mode="Markdown")
-                elif call.data.startswith("skip_"):
-                    user_choice["action"] = "skip"
-                    bot.answer_callback_query(call.id, "Salteado.")
-                    bot.edit_message_caption(chat_id=TELEGRAM_CHAT_ID, message_id=msg.message_id, caption="⏭️ *Producto salteado.*", parse_mode="Markdown")
-                elif call.data == "stop":
-                    user_choice["action"] = "stop"
-                    bot.answer_callback_query(call.id, "Deteniendo proceso...")
-                    bot.edit_message_caption(chat_id=TELEGRAM_CHAT_ID, message_id=msg.message_id, caption="🛑 *Proceso detenido.*", parse_mode="Markdown")
-                
-                bot.stop_polling()
-
             bot.polling(timeout=300, non_stop=False)
             
             if os.path.exists(image_path):
