@@ -1,9 +1,7 @@
 name: Publicar Instagram Story
 
 on:
-  workflow_dispatch: # Ejecución manual
-  # schedule:
-  #   - cron: '0 15 * * *' # Opcional: Publicar automáticamente todos los días a las 12:00 hs Argentina (15:00 UTC)
+  workflow_dispatch: # Permite ejecución manual
 
 jobs:
   publish:
@@ -20,12 +18,12 @@ jobs:
       - name: Instalar dependencias
         run: |
           python -m pip install --upgrade pip
-          pip install requests
+          pip install requests pillow pyTelegramBotAPI
 
-      - name: Ejecutar script de publicación
+      - name: Generar plantilla y solicitar aprobación
         env:
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
-          WOO_CONSUMER_KEY: ${{ secrets.WOO_CONSUMER_KEY }}
-          WOO_CONSUMER_SECRET: ${{ secrets.WOO_CONSUMER_SECRET }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python publish_story.py
