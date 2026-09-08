@@ -84,14 +84,30 @@ def get_product_and_image():
                 # Validación de stock / reservas / encargo
                 is_on_backorder = product.get("is_on_backorder", False)
                 stock_status = product.get("stock_status", "")
-                price_raw = product.get("prices", {}).get("price", "0")
+                
+                prices_dict = product.get("prices", {})
+                # Priorizar precio de oferta/regular directo de la estructura wc/store
+                price_raw = prices_dict.get("price")
+                
+                # Intentar leer desde 'regular_price' o campos específicos si existen
+                if not price_raw or price_raw == "0":
+                    price_raw = product.get("price", "0")
+                
                 is_on_demand = False
                 
                 if is_on_backorder or stock_status == "onbackorder" or not str(price_raw).isdigit() or int(price_raw) == 0:
                     is_on_demand = True
                     price = "¡DISPONIBLE POR ENCARGO!"
                 else:
-                    price = f"${int(price_raw) / 100:,.0f}".replace(",", ".")
+                    # Convierte desde centavos si viene en formato WooCommerce Store API (> 1000)
+                    val = int(price_raw)
+                    # Si el número viene en centavos (ej: 123500000 para $1.235.000) o en enteros
+                    if val > 10000000:  # Centavos para montos de millones
+                        val = val // 100
+                    elif val > 100000 and val % 100 == 0:
+                        val = val // 100
+                        
+                    price = f"${val:,.0f}".replace(",", ".")
                 
                 raw_name = clean_text(product.get("name", "Producto Cuantico"))
                 ai_name = generate_ai_title(raw_name)
@@ -109,7 +125,7 @@ def get_product_and_image():
 
     print("No se encontró ningún producto con imagen procesable.")
     exit(1)
-
+    
 def create_story_template(product):
     """Genera la plantilla visual de 1080x1920 px con encuadre, fuentes e IA."""
     canvas_w, canvas_h = 1080, 1920
