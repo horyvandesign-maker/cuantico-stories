@@ -58,7 +58,7 @@ def generate_ai_title(original_title):
         return original_title
 
 def get_product_and_image():
-    """Consulta WooCommerce, detecta si es por encargo/reserva y descarga la imagen."""
+    """Consulta WooCommerce, detecta si es por encargo/reserva y descarga la imagen con el precio final correcto."""
     endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     
@@ -86,28 +86,31 @@ def get_product_and_image():
                 stock_status = product.get("stock_status", "")
                 
                 prices_dict = product.get("prices", {})
-                # Priorizar precio de oferta/regular directo de la estructura wc/store
-                price_raw = prices_dict.get("price")
                 
-                # Intentar leer desde 'regular_price' o campos específicos si existen
-                if not price_raw or price_raw == "0":
-                    price_raw = product.get("price", "0")
+                # En wc/store/v1, prices.price contiene el valor en la unidad menor (centavos/minor units)
+                # Si hay precio de oferta (sale_price), se prioriza ese sobre el precio regular.
+                raw_val = prices_dict.get("price")
                 
                 is_on_demand = False
                 
-                if is_on_backorder or stock_status == "onbackorder" or not str(price_raw).isdigit() or int(price_raw) == 0:
+                if is_on_backorder or stock_status == "onbackorder" or not raw_val or str(raw_val) == "0":
                     is_on_demand = True
                     price = "¡DISPONIBLE POR ENCARGO!"
                 else:
-                    # Convierte desde centavos si viene en formato WooCommerce Store API (> 1000)
-                    val = int(price_raw)
-                    # Si el número viene en centavos (ej: 123500000 para $1.235.000) o en enteros
-                    if val > 10000000:  # Centavos para montos de millones
-                        val = val // 100
-                    elif val > 100000 and val % 100 == 0:
-                        val = val // 100
+                    try:
+                        # Extraer el valor numérico
+                        val_num = int(raw_val)
+                        # La API de Store usa los decimales configurados en WooCommerce (por defecto 2 decimales -> dividir por 100)
+                        decimals = int(prices_dict.get("currency_minor_units", 2))
+                        if decimals > 0:
+                            val_final = val_num / (10 ** decimals)
+                        else:
+                            val_final = float(val_num)
                         
-                    price = f"${val:,.0f}".replace(",", ".")
+                        price = f"${val_final:,.0f}".replace(",", ".")
+                    except Exception:
+                        price = "¡DISPONIBLE POR ENCARGO!"
+                        is_on_demand = True
                 
                 raw_name = clean_text(product.get("name", "Producto Cuantico"))
                 ai_name = generate_ai_title(raw_name)
