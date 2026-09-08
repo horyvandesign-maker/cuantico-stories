@@ -1,25 +1,67 @@
 import os
+import random
 import time
 import requests
 
-# Cargar variables de entorno desde los Secrets
+# Variables de entorno desde GitHub Secrets
 IG_USER_ID = os.environ.get("IG_USER_ID")
 ACCESS_TOKEN = os.environ.get("INSTAGRAM_ACCESS_TOKEN")
+WOO_CK = os.environ.get("WOO_CONSUMER_KEY")
+WOO_CS = os.environ.get("WOO_CONSUMER_SECRET")
 
-# URL de la imagen directamente desde WooCommerce (debe ser JPG/PNG accesible públicamente)
-# Cambiá esta URL por la imagen real de un producto de tu tienda para hacer la prueba
-IMAGE_URL = "https://cuanticopc.com.ar/wp-content/uploads/2026/09/D_NQ_NP_2X_924842-MLA115590516980_092026-O.jpg" 
+# URL base de tu tienda WooCommerce
+SITE_URL = "https://cuanticopc.com.ar"
+
+def get_random_product_image():
+    """Consulta la API de WooCommerce y devuelve la URL de una imagen JPG/PNG válida."""
+    endpoint = f"{SITE_URL}/wp-json/wc/v3/products"
+    params = {
+        "status": "publish",
+        "stock_status": "instock",
+        "per_page": 50  # Revisa los últimos 50 productos en stock
+    }
+    
+    print("Obteniendo catálogo de WooCommerce...")
+    res = requests.get(endpoint, params=params, auth=(WOO_CK, WOO_CS))
+    
+    if res.status_code != 200:
+        print(f"Error al conectar con WooCommerce: {res.json()}")
+        exit(1)
+        
+    products = res.json()
+    if not products:
+        print("No se encontraron productos publicados con stock.")
+        exit(1)
+        
+    # Mezclamos la lista de productos al azar
+    random.shuffle(products)
+    
+    # Buscamos un producto que tenga una imagen JPG o PNG
+    for product in products:
+        images = product.get("images", [])
+        for img in images:
+            img_url = img.get("src", "")
+            clean_url = img_url.split("?")[0].lower()
+            if clean_url.endswith((".jpg", ".jpeg", ".png")):
+                print(f"Producto seleccionado: '{product['name']}'")
+                print(f"Imagen válida encontrada: {img_url}")
+                return img_url
+
+    print("No se encontró ningún producto con imágenes en formato JPG/PNG.")
+    exit(1)
 
 def post_instagram_story():
+    image_url = get_random_product_image()
+    
     # 1. Crear el contenedor para la Story
     container_url = f"https://graph.facebook.com/v26.0/{IG_USER_ID}/media"
     payload = {
-        "image_url": IMAGE_URL,
+        "image_url": image_url,
         "media_type": "STORIES",
         "access_token": ACCESS_TOKEN
     }
     
-    print("Creando contenedor de la historia...")
+    print("Creando contenedor de la historia en Meta...")
     res = requests.post(container_url, data=payload)
     res_data = res.json()
     
@@ -28,24 +70,24 @@ def post_instagram_story():
         exit(1)
         
     container_id = res_data["id"]
-    print(f"Contenedor creado con éxito ID: {container_id}")
+    print(f"Contenedor creado exitosamente. ID: {container_id}")
     
-    # Esperar 5 segundos para que los servidores de Meta procesen la imagen
+    # Esperar 5 segundos para el procesamiento en los servidores de Meta
     time.sleep(5)
     
-    # 2. Publicar el contenedor en Instagram Stories
+    # 2. Publicar la historia
     publish_url = f"https://graph.facebook.com/v26.0/{IG_USER_ID}/media_publish"
     pub_payload = {
         "creation_id": container_id,
         "access_token": ACCESS_TOKEN
     }
     
-    print("Publicando la historia...")
+    print("Publicando historia en Instagram...")
     pub_res = requests.post(publish_url, data=pub_payload)
     pub_data = pub_res.json()
     
     if "id" in pub_data:
-        print(f"¡Historia publicada con éxito! ID de la publicación: {pub_data['id']}")
+        print(f"¡Historia publicada con éxito! ID: {pub_data['id']}")
     else:
         print(f"Error al publicar la historia: {pub_data}")
         exit(1)
