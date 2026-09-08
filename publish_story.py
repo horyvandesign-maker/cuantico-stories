@@ -2,6 +2,7 @@ import os
 import time
 import html
 import textwrap
+import random
 import requests
 from io import BytesIO
 from PIL import Image, ImageFilter, ImageDraw, ImageFont
@@ -18,6 +19,9 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 SITE_URL = "https://cuanticopc.com.ar"
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
+
+# Paleta de colores dinámicos para darle dinamismo a cada publicación
+ACCENT_COLORS = ["#00FF88", "#00E5FF", "#B000FF"]
 
 def get_font(size):
     """Obtiene una tipografía vectorial escalable preinstalada en Linux."""
@@ -57,7 +61,7 @@ def generate_ai_title(original_title):
         return original_title
 
 def fetch_all_valid_products():
-    """Obtiene todos los productos validando estrictamente que tengan precio real y no datos cacheados."""
+    """Obtiene todos los productos validando de forma estricta stock y precio directo sin caché."""
     endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
@@ -69,7 +73,6 @@ def fetch_all_valid_products():
     page = 1
     
     while True:
-        # Añadimos un parámetro nocache para forzar a WooCommerce a saltearse la caché de la API
         params = {
             "per_page": 50,
             "page": page,
@@ -89,7 +92,7 @@ def fetch_all_valid_products():
             if not images:
                 continue
             
-            # Chequeo de stock
+            # Verificación de stock
             stock_status = product.get("stock_status", "")
             is_in_stock = product.get("is_in_stock", True)
             if stock_status == "outofstock" or not is_in_stock:
@@ -98,7 +101,7 @@ def fetch_all_valid_products():
             prices_info = product.get("prices", {})
             raw_price = prices_info.get("price")
             
-            # Verificación estricta: No None, no vacío, no "0"
+            # Filtrar si no hay precio cargado
             if raw_price is None or str(raw_price).strip() in ["", "0", "null"]:
                 continue
                 
@@ -108,7 +111,6 @@ def fetch_all_valid_products():
             val_num = int(raw_price)
             val_final = val_num / 100
             
-            # Si el valor resultante es 0 o menor, descartar
             if val_final <= 0:
                 continue
 
@@ -123,9 +125,9 @@ def fetch_all_valid_products():
             
         page += 1
 
-    print(f"Se encontraron {len(valid_products)} productos con precio válido.")
+    print(f"Se encontraron {len(valid_products)} productos con precio y stock válidos.")
     return valid_products
-    
+
 def draw_vertical_gradient(draw_obj, rect, color_top, color_bottom):
     """Dibuja un degradado vertical suave."""
     x1, y1, x2, y2 = rect
@@ -139,24 +141,25 @@ def draw_vertical_gradient(draw_obj, rect, color_top, color_bottom):
         draw_obj.line([(x1, y1 + i), (x2, y1 + i)], fill=(r, g, b, a))
 
 def create_story_template(product, img_obj):
-    """Genera la plantilla profesional enriquecida con tarjeta, badge, gradientes y logo."""
+    """Genera la plantilla con dinamismo en la posición del logo y paleta de color."""
     canvas_w, canvas_h = 1080, 1920
     
-    # 1. Fondo difuminado de alta calidad
-    bg = img_obj.resize((canvas_w, canvas_h)).filter(ImageFilter.GaussianBlur(50))
+    # Color de acento aleatorio para esta publicación
+    accent_color = random.choice(ACCENT_COLORS)
     
-    # Overlay base oscuro
+    # 1. Fondo difuminado
+    bg = img_obj.resize((canvas_w, canvas_h)).filter(ImageFilter.GaussianBlur(50))
     overlay = Image.new("RGBA", (canvas_w, canvas_h), (12, 12, 18, 160))
     bg.paste(overlay, (0, 0), overlay)
     
-    # 2. Gradientes de sombra superior e inferior (Punto 4)
+    # 2. Gradientes de sombra
     gradient_layer = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     g_draw = ImageDraw.Draw(gradient_layer)
     draw_vertical_gradient(g_draw, (0, 0, canvas_w, 350), (0, 0, 0, 210), (0, 0, 0, 0))
     draw_vertical_gradient(g_draw, (0, canvas_h - 350, canvas_w, canvas_h), (0, 0, 0, 0), (0, 0, 0, 230))
     bg.paste(gradient_layer, (0, 0), gradient_layer)
     
-    # 3. Tarjeta contenedora con esquinas redondeadas para el producto (Punto 1)
+    # 3. Tarjeta para el producto
     card_w, card_h = 860, 860
     card_x = (canvas_w - card_w) // 2
     card_y = 420
@@ -168,7 +171,6 @@ def create_story_template(product, img_obj):
     
     bg.paste(card_bg, (card_x, card_y), card_mask)
     
-    # Insertar imagen del producto centrada dentro de la tarjeta
     img_copy = img_obj.copy()
     img_copy.thumbnail((760, 760))
     p_w, p_h = img_copy.size
@@ -178,20 +180,36 @@ def create_story_template(product, img_obj):
     
     draw = ImageDraw.Draw(bg)
     
-    # 4. Logo en la parte superior (Punto 4)
-    logo_path = "logo.png"
+    # 4. Render del Logo con posición aleatoria (Izquierda, Centro o Derecha)
+    logo_path = os.path.join(os.path.dirname(__file__), "logo_canva.png")
+    
     if os.path.exists(logo_path):
         try:
             logo_img = Image.open(logo_path).convert("RGBA")
-            logo_img.thumbnail((450, 130))
+            logo_img.thumbnail((380, 120))
             l_w, l_h = logo_img.size
-            bg.paste(logo_img, ((canvas_w - l_w) // 2, 140), logo_img)
-        except Exception:
+            
+            # Elegir posición aleatoria
+            positions = ["left", "center", "right"]
+            chosen_pos = random.choice(positions)
+            
+            if chosen_pos == "left":
+                logo_x = 70
+            elif chosen_pos == "right":
+                logo_x = canvas_w - l_w - 70
+            else:
+                logo_x = (canvas_w - l_w) // 2
+                
+            logo_y = 130
+            # Importante: usar logo_img como máscara alfa para preservar la transparencia
+            bg.paste(logo_img, (logo_x, logo_y), logo_img)
+        except Exception as e:
+            print(f"Error procesando el logo: {e}")
             draw.text((canvas_w // 2, 160), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
     else:
         draw.text((canvas_w // 2, 160), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
     
-    # 5. Título del producto mejor estructurado (Punto 3)
+    # 5. Título del producto
     font_title = get_font(42)
     wrapped_lines = textwrap.wrap(product["ai_name"], width=22)
     wrapped_text = "\n".join(wrapped_lines[:3])
@@ -206,11 +224,10 @@ def create_story_template(product, img_obj):
         align="center"
     )
     
-    # 6. Badge / Botón destacado para el Precio (Punto 2)
+    # 6. Cápsula del precio con acento dinámico
     font_price = get_font(58)
     price_str = product["price"]
     
-    # Calcular ancho del texto para ajustar el tamaño del botón
     bbox = draw.textbbox((0, 0), price_str, font=font_price)
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
@@ -225,9 +242,8 @@ def create_story_template(product, img_obj):
     badge_x2 = badge_x1 + badge_w
     badge_y2 = badge_y1 + badge_h
     
-    # Dibujar cápsula con fondo oscuro estilizado
-    draw.rounded_rectangle((badge_x1, badge_y1, badge_x2, badge_y2), radius=25, fill=(18, 22, 28, 240), outline="#00FF88", width=3)
-    draw.text(((badge_x1 + badge_x2) // 2, (badge_y1 + badge_y2) // 2 - 3), price_str, fill="#00FF88", font=font_price, anchor="mm")
+    draw.rounded_rectangle((badge_x1, badge_y1, badge_x2, badge_y2), radius=25, fill=(18, 22, 28, 240), outline=accent_color, width=3)
+    draw.text(((badge_x1 + badge_x2) // 2, (badge_y1 + badge_y2) // 2 - 3), price_str, fill=accent_color, font=font_price, anchor="mm")
     
     # 7. Marca de agua inferior
     font_footer = get_font(38)
