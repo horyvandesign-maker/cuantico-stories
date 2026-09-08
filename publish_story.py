@@ -1,7 +1,12 @@
 import os
 import random
 import time
+import urllib3
 import requests
+from requests.adapters import HTTPAdapter
+
+# Forzar a requests a usar IPv4 (evita 'Network is unreachable' en GitHub Actions)
+urllib3.util.connection.HAS_IPV6 = False
 
 # Variables de entorno desde GitHub Secrets
 IG_USER_ID = os.environ.get("IG_USER_ID")
@@ -9,23 +14,28 @@ ACCESS_TOKEN = os.environ.get("INSTAGRAM_ACCESS_TOKEN")
 WOO_CK = os.environ.get("WOO_CONSUMER_KEY")
 WOO_CS = os.environ.get("WOO_CONSUMER_SECRET")
 
-# URL base de tu tienda WooCommerce
 SITE_URL = "https://cuanticopc.com.ar"
 
 def get_random_product_image():
-    """Consulta la API de WooCommerce y devuelve la URL de una imagen JPG/PNG válida."""
+    """Consulta la API de WooCommerce usando IPv4 y devuelve la URL de una imagen JPG/PNG válida."""
     endpoint = f"{SITE_URL}/wp-json/wc/v3/products"
     params = {
         "status": "publish",
         "stock_status": "instock",
-        "per_page": 50  # Revisa los últimos 50 productos en stock
+        "per_page": 50
+    }
+    
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
     
     print("Obteniendo catálogo de WooCommerce...")
-    res = requests.get(endpoint, params=params, auth=(WOO_CK, WOO_CS))
+    
+    session = requests.Session()
+    res = session.get(endpoint, params=params, auth=(WOO_CK, WOO_CS), headers=headers, timeout=20)
     
     if res.status_code != 200:
-        print(f"Error al conectar con WooCommerce: {res.json()}")
+        print(f"Error al conectar con WooCommerce (Código {res.status_code}): {res.text}")
         exit(1)
         
     products = res.json()
@@ -33,10 +43,8 @@ def get_random_product_image():
         print("No se encontraron productos publicados con stock.")
         exit(1)
         
-    # Mezclamos la lista de productos al azar
     random.shuffle(products)
     
-    # Buscamos un producto que tenga una imagen JPG o PNG
     for product in products:
         images = product.get("images", [])
         for img in images:
@@ -72,7 +80,6 @@ def post_instagram_story():
     container_id = res_data["id"]
     print(f"Contenedor creado exitosamente. ID: {container_id}")
     
-    # Esperar 5 segundos para el procesamiento en los servidores de Meta
     time.sleep(5)
     
     # 2. Publicar la historia
