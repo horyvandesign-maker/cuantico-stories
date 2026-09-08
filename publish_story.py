@@ -33,7 +33,7 @@ def clean_text(text):
     return decoded.replace('"', "'").replace("”", "'").strip()
 
 def get_product_and_image():
-    """Obtiene un producto activo desde WooCommerce."""
+    """Obtiene un producto activo desde WooCommerce y detecta si es por reserva/encargo."""
     endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     
@@ -56,11 +56,15 @@ def get_product_and_image():
             if img_res.status_code == 200:
                 img_orig = Image.open(BytesIO(img_res.content)).convert("RGB")
                 
-                # Gestión de Precios y Productos "Por Encargo"
+                # Detectar si se puede reservar / por encargo / backorder
+                is_on_backorder = product.get("is_on_backorder", False)
+                stock_status = product.get("stock_status", "")
+                
                 price_raw = product.get("prices", {}).get("price", "0")
                 is_on_demand = False
                 
-                if not str(price_raw).isdigit() or int(price_raw) == 0:
+                # Si está marcado como reserva, backorder, o vale $0 -> SIN PRECIO
+                if is_on_backorder or stock_status == "onbackorder" or not str(price_raw).isdigit() or int(price_raw) == 0:
                     is_on_demand = True
                     price = "¡DISPONIBLE POR ENCARGO!"
                 else:
@@ -80,7 +84,7 @@ def get_product_and_image():
 
     print("No se encontró ningún producto con imagen procesable.")
     exit(1)
-
+    
 def create_story_template(product):
     """Genera el lienzo vertical de 1080x1920 px con textos formateados."""
     canvas_w, canvas_h = 1080, 1920
