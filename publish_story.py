@@ -20,7 +20,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 SITE_URL = "https://cuanticopc.com.ar"
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
-# Paleta de colores dinámicos para darle dinamismo a cada publicación
+# Paleta de colores dinámicos
 ACCENT_COLORS = ["#00FF88", "#00E5FF", "#B000FF"]
 
 def get_font(size):
@@ -141,10 +141,9 @@ def draw_vertical_gradient(draw_obj, rect, color_top, color_bottom):
         draw_obj.line([(x1, y1 + i), (x2, y1 + i)], fill=(r, g, b, a))
 
 def create_story_template(product, img_obj):
-    """Genera la plantilla con dinamismo en la posición del logo y paleta de color."""
+    """Genera la plantilla con dinamismo y logo agrandado."""
     canvas_w, canvas_h = 1080, 1920
     
-    # Color de acento aleatorio para esta publicación
     accent_color = random.choice(ACCENT_COLORS)
     
     # 1. Fondo difuminado
@@ -180,28 +179,27 @@ def create_story_template(product, img_obj):
     
     draw = ImageDraw.Draw(bg)
     
-    # 4. Render del Logo con posición aleatoria (Izquierda, Centro o Derecha)
+    # 4. Render del Logo Agrandado con Posición Aleatoria
     logo_path = os.path.join(os.path.dirname(__file__), "logo_canva.png")
     
     if os.path.exists(logo_path):
         try:
             logo_img = Image.open(logo_path).convert("RGBA")
-            logo_img.thumbnail((380, 120))
+            # Redimensionado más grande
+            logo_img.thumbnail((550, 220))
             l_w, l_h = logo_img.size
             
-            # Elegir posición aleatoria
             positions = ["left", "center", "right"]
             chosen_pos = random.choice(positions)
             
             if chosen_pos == "left":
-                logo_x = 70
+                logo_x = 50
             elif chosen_pos == "right":
-                logo_x = canvas_w - l_w - 70
+                logo_x = canvas_w - l_w - 50
             else:
                 logo_x = (canvas_w - l_w) // 2
                 
-            logo_y = 130
-            # Importante: usar logo_img como máscara alfa para preservar la transparencia
+            logo_y = 110
             bg.paste(logo_img, (logo_x, logo_y), logo_img)
         except Exception as e:
             print(f"Error procesando el logo: {e}")
@@ -224,7 +222,7 @@ def create_story_template(product, img_obj):
         align="center"
     )
     
-    # 6. Cápsula del precio con acento dinámico
+    # 6. Cápsula del precio
     font_price = get_font(58)
     price_str = product["price"]
     
