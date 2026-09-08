@@ -3,12 +3,10 @@ import random
 import time
 import urllib3
 import requests
-from requests.adapters import HTTPAdapter
 
-# Forzar a requests a usar IPv4 (evita 'Network is unreachable' en GitHub Actions)
+# Forzar IPv4 para evitar problemas de conexión desde GitHub Actions
 urllib3.util.connection.HAS_IPV6 = False
 
-# Variables de entorno desde GitHub Secrets
 IG_USER_ID = os.environ.get("IG_USER_ID")
 ACCESS_TOKEN = os.environ.get("INSTAGRAM_ACCESS_TOKEN")
 WOO_CK = os.environ.get("WOO_CONSUMER_KEY")
@@ -16,21 +14,28 @@ WOO_CS = os.environ.get("WOO_CONSUMER_SECRET")
 
 SITE_URL = "https://cuanticopc.com.ar"
 
+def clean_image_url(url):
+    """Limpia parámetros y convierte extensiones .avif/.webp a .jpg."""
+    base_url = url.split("?")[0]
+    for ext in [".avif", ".webp", ".png", ".jpeg"]:
+        if base_url.lower().endswith(ext):
+            base_url = base_url[:-len(ext)] + ".jpg"
+            break
+    return base_url
+
 def get_random_product_image():
-    """Consulta la API de WooCommerce usando IPv4 y devuelve la URL de una imagen JPG/PNG válida."""
+    """Obtiene un producto en stock de WooCommerce y retorna la URL de su imagen."""
     endpoint = f"{SITE_URL}/wp-json/wc/v3/products"
     params = {
         "status": "publish",
         "stock_status": "instock",
         "per_page": 50
     }
-    
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
     
     print("Obteniendo catálogo de WooCommerce...")
-    
     session = requests.Session()
     res = session.get(endpoint, params=params, auth=(WOO_CK, WOO_CS), headers=headers, timeout=20)
     
@@ -47,15 +52,14 @@ def get_random_product_image():
     
     for product in products:
         images = product.get("images", [])
-        for img in images:
-            img_url = img.get("src", "")
-            clean_url = img_url.split("?")[0].lower()
-            if clean_url.endswith((".jpg", ".jpeg", ".png")):
-                print(f"Producto seleccionado: '{product['name']}'")
-                print(f"Imagen válida encontrada: {img_url}")
-                return img_url
+        if images:
+            raw_url = images[0].get("src", "")
+            final_url = clean_image_url(raw_url)
+            print(f"Producto seleccionado: '{product['name']}'")
+            print(f"URL de imagen procesada: {final_url}")
+            return final_url
 
-    print("No se encontró ningún producto con imágenes en formato JPG/PNG.")
+    print("No se encontró ningún producto con imágenes cargadas.")
     exit(1)
 
 def post_instagram_story():
