@@ -10,7 +10,6 @@ import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from google import genai
 
-# Carga de credenciales
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 IG_USER_ID = os.environ.get("IG_USER_ID")
@@ -75,11 +74,11 @@ def generate_ai_title(original_title):
         print(f"Fallback a título original: {e}")
         return original_title
 
-def fetch_all_valid_products():
+def fetch_all_catalog_products():
     """
-    Filtro estricto: Detecta si el producto está en reserva ('Se puede reservar'), 
-    si no tiene stock o si está pausado en WooSync. 
-    EN ESOS CASOS ANULA CUALQUIER PRECIO QUE DEVUELVA LA BASE DE DATOS.
+    Lee todo el catálogo y clasifica estrictamente por estado de stock real.
+    Si stock_status != 'instock' o is_in_stock == False, lo fuerza como 'POR ENCARGUE'
+    sin importar el precio en base de datos.
     """
     endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
     headers = {
@@ -88,7 +87,7 @@ def fetch_all_valid_products():
         "Pragma": "no-cache"
     }
     
-    valid_products = []
+    catalog = []
     page = 1
     
     while True:
@@ -106,23 +105,23 @@ def fetch_all_valid_products():
             if not images:
                 continue
 
-            status = product.get("status", "publish")
+            # Verificación del stock real
             stock_status = product.get("stock_status", "")
             is_in_stock = product.get("is_in_stock", True)
             backorders_allowed = product.get("backorders_allowed", False)
             
-            # REGLA DE ORO: Si stock es 0, 'Se puede reservar', sin stock o no publicado -> POR ENCARGUE OBLIGATORIO
+            # Evaluación: Si no está en stock, inmediatamente pasa a "Por Encargue"
             is_on_demand = False
-            
-            if not is_in_stock or stock_status in ["outofstock", "onbackorder"] or backorders_allowed or status != "publish":
+            if not is_in_stock or stock_status in ["outofstock", "onbackorder"] or backorders_allowed:
                 is_on_demand = True
-            
-            # Si el producto se identifica como "por encargue", IGNORAMOS cualquier precio retornado por la base de datos
+
+            prices_info = product.get("prices", {})
+            raw_price = prices_info.get("price")
+
+            # Regla de asignación de precio
             if is_on_demand:
                 formatted_price = "POR ENCARGUE"
             else:
-                prices_info = product.get("prices", {})
-                raw_price = prices_info.get("price")
                 if raw_price and str(raw_price).isdigit() and int(raw_price) > 0:
                     val_final = int(raw_price) / 100
                     formatted_price = f"${val_final:,.0f}".replace(",", ".")
@@ -130,7 +129,7 @@ def fetch_all_valid_products():
                     is_on_demand = True
                     formatted_price = "POR ENCARGUE"
 
-            valid_products.append({
+            catalog.append({
                 "id": product.get("id"),
                 "original_name": clean_text(product.get("name", "Producto Cuantico")),
                 "price": formatted_price,
@@ -140,8 +139,8 @@ def fetch_all_valid_products():
             
         page += 1
 
-    print(f"Se encontraron {len(valid_products)} productos procesables.")
-    return valid_products
+    print(f"Total productos en catálogo a procesar: {len(catalog)}")
+    return catalog
 
 def draw_vertical_gradient(draw_obj, rect, color_top, color_bottom):
     x1, y1, x2, y2 = rect
@@ -200,8 +199,7 @@ def create_story_template(product, img_obj):
             logo_img = Image.open(logo_path).convert("RGBA")
             logo_img.thumbnail((550, 220))
             l_w, l_h = logo_img.size
-            positions = ["left", "center", "right"]
-            chosen_pos = random.choice(positions)
+            chosen_pos = random.choice(["left", "center", "right"])
             
             if chosen_pos == "left":
                 logo_x = 50
@@ -212,7 +210,7 @@ def create_story_template(product, img_obj):
                 
             logo_y = 110
             bg.paste(logo_img, (logo_x, logo_y), logo_img)
-        except Exception as e:
+        except Exception:
             draw.text((canvas_w // 2, 160), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
     else:
         draw.text((canvas_w // 2, 160), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
@@ -224,15 +222,15 @@ def create_story_template(product, img_obj):
     title_y = card_y + card_h + 90
     draw.multiline_text((canvas_w // 2, title_y), wrapped_text, fill="#FFFFFF", font=font_title, anchor="mm", align="center")
     
-    font_size = 44 if product["is_on_demand"] else 58
+    font_size = 42 if product["is_on_demand"] else 58
     font_badge = get_font(font_size)
     
     bbox = draw.textbbox((0, 0), display_label, font=font_badge)
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
     
-    badge_padding_x = 50
-    badge_padding_y = 25
+    badge_padding_x = 45
+    badge_padding_y = 22
     badge_w = text_w + (badge_padding_x * 2)
     badge_h = text_h + (badge_padding_y * 2)
     
@@ -273,15 +271,15 @@ def publish_to_instagram(image_url):
     return False, pub_data
 
 def process_catalog():
-    products = fetch_all_valid_products()
+    products = fetch_all_catalog_products()
     if not products:
-        bot.send_message(TELEGRAM_CHAT_ID, "❌ No se encontraron productos para procesar.")
+        bot.send_message(TELEGRAM_CHAT_ID, "❌ No se encontraron productos.")
         return
 
     headers = {"User-Agent": "Mozilla/5.0"}
     total = len(products)
     
-    bot.send_message(TELEGRAM_CHAT_ID, f"🚀 *Iniciando revisión de catálogo completo* ({total} productos).", parse_mode="Markdown")
+    bot.send_message(TELEGRAM_CHAT_ID, f"🚀 *Catálogo preparado:* {total} productos en total.", parse_mode="Markdown")
 
     for index, prod in enumerate(products, start=1):
         try:
@@ -296,20 +294,20 @@ def process_catalog():
             
             markup = InlineKeyboardMarkup()
             markup.row(
-                InlineKeyboardButton("✅ Aprobar y Publicar", callback_data=f"approve_{prod['id']}"),
-                InlineKeyboardButton("⏭️ Siguiente", callback_data=f"skip_{prod['id']}"),
+                InlineKeyboardButton("✅ Publicar Story", callback_data=f"approve_{prod['id']}"),
+                InlineKeyboardButton("⏭️ Saltear", callback_data=f"skip_{prod['id']}"),
                 InlineKeyboardButton("🛑 Detener", callback_data="stop")
             )
             
             type_str = "📦 POR ENCARGUE" if prod["is_on_demand"] else f"💰 {prod['price']}"
             caption = (
                 f"📦 *[{index}/{total}] {prod['original_name']}*\n"
-                f"Estado: *{type_str}*\n\n"
-                f"¿Publicar esta Story?"
+                f"Estado asignado: *{type_str}*\n\n"
+                f"¿Deseas enviar esta Story a Instagram?"
             )
             
             with open(image_path, "rb") as photo:
-                msg = bot.send_photo(TELEGRAM_CHAT_ID, photo, caption=caption, reply_markup=markup, parse_mode="Markdown")
+                bot.send_photo(TELEGRAM_CHAT_ID, photo, caption=caption, reply_markup=markup, parse_mode="Markdown")
                 
             user_choice["action"] = None
             bot.polling(timeout=300, non_stop=False)
@@ -320,13 +318,13 @@ def process_catalog():
             if user_choice["action"] == "approve":
                 success, result = publish_to_instagram(prod["raw_url"])
                 if success:
-                    bot.send_message(TELEGRAM_CHAT_ID, f"🎉 ¡Publicado exitosamente en Instagram!", parse_mode="Markdown")
+                    bot.send_message(TELEGRAM_CHAT_ID, "🎉 ¡Publicado con éxito en Instagram Stories!", parse_mode="Markdown")
                 else:
-                    bot.send_message(TELEGRAM_CHAT_ID, f"❌ Error al publicar en Meta: `{result}`", parse_mode="Markdown")
+                    bot.send_message(TELEGRAM_CHAT_ID, f"❌ Error Meta: `{result}`", parse_mode="Markdown")
                 time.sleep(3)
                 
             elif user_choice["action"] == "stop":
-                bot.send_message(TELEGRAM_CHAT_ID, "🏁 *Secuencia finalizada por el usuario.*", parse_mode="Markdown")
+                bot.send_message(TELEGRAM_CHAT_ID, "🏁 *Proceso detenido.*", parse_mode="Markdown")
                 break
                 
         except Exception as e:
