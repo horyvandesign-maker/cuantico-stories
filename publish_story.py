@@ -8,7 +8,7 @@ ACCESS_TOKEN = os.environ.get("INSTAGRAM_ACCESS_TOKEN")
 
 # URL de la imagen directamente desde WooCommerce (debe ser JPG/PNG accesible públicamente)
 # Cambiá esta URL por la imagen real de un producto de tu tienda para hacer la prueba
-IMAGE_URL = "https://cuanticopc.com/wp-content/uploads/2026/01/producto-ejemplo.jpg" 
+IMAGE_URL = "https://cuanticopc.com.ar/wp-content/uploads/2026/09/D_NQ_NP_2X_924842-MLA115590516980_092026-O.jpg" 
 
 def post_instagram_story():
     # 1. Crear el contenedor para la Story
