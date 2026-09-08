@@ -7,9 +7,10 @@ import requests
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import telebot
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from google import genai
 
-# Credenciales desde Variables de Entorno / Secrets
+# Configuración de Variables de Entorno
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 IG_USER_ID = os.environ.get("IG_USER_ID")
@@ -56,6 +57,7 @@ def generate_ai_title(original_title):
         return original_title
 
 def fetch_all_valid_products():
+    """Descarga el catálogo FILTRANDO estrictamente productos activos e in-stock."""
     endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
@@ -74,10 +76,16 @@ def fetch_all_valid_products():
             break
             
         for product in items:
+            # FILTRO CRÍTICO 1: No procesar productos que no estén 'publish' (pausados, borradores, etc.)
+            if product.get("status") != "publish":
+                continue
+
+            # FILTRO CRÍTICO 2: Control estricto de Stock
+            if product.get("stock_status") != "instock" or not product.get("is_in_stock", True):
+                continue
+
             images = product.get("images", [])
             if not images:
-                continue
-            if product.get("stock_status") == "outofstock" or not product.get("is_in_stock", True):
                 continue
 
             raw_price = product.get("prices", {}).get("price")
@@ -96,7 +104,7 @@ def fetch_all_valid_products():
             })
         page += 1
 
-    print(f"Productos válidos encontrados: {len(valid_products)}")
+    print(f"Productos activos en stock encontrados: {len(valid_products)}")
     return valid_products
 
 def draw_vertical_gradient(draw_obj, rect, color_top, color_bottom):
@@ -110,19 +118,11 @@ def draw_vertical_gradient(draw_obj, rect, color_top, color_bottom):
         a = int(color_top[3] * (1 - ratio) + color_bottom[3] * ratio)
         draw_obj.line([(x1, y1 + i), (x2, y1 + i)], fill=(r, g, b, a))
 
-def draw_cyber_grid(draw_obj, rect):
-    x1, y1, x2, y2 = rect
-    grid_color = (138, 43, 226, random.randint(40, 80))
-    for i in range(0, 200, 25):
-        draw_obj.line([(x1, y1 + i), (x2, y1 + i)], fill=grid_color, width=1)
-    center_x = (x1 + x2) // 2
-    for offset in range(-600, 700, 80):
-        draw_obj.line([(center_x + offset // 3, y1), (center_x + offset, y2)], fill=grid_color, width=1)
-
-def create_story_template(product, img_obj):
+def create_story_template(product, img_obj, mode="STOCK"):
     canvas_w, canvas_h = 1080, 1920
     accent_color = random.choice(ACCENT_COLORS)
-    header_text = random.choice(HEADER_TAGS)
+    
+    header_text = "CONSEGUILO POR ENCARGO" if mode == "ENCARGO" else random.choice(HEADER_TAGS)
     
     bg = Image.new("RGBA", (canvas_w, canvas_h), (10, 8, 20, 255))
     g_layer = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
@@ -130,11 +130,10 @@ def create_story_template(product, img_obj):
     draw_vertical_gradient(g_draw, (0, 0, canvas_w, canvas_h), (18, 12, 38, 255), (6, 5, 15, 255))
     bg.paste(g_layer, (0, 0), g_layer)
     
-    cyber_draw = ImageDraw.Draw(bg)
-    draw_cyber_grid(cyber_draw, (0, canvas_h - 250, canvas_w, canvas_h))
+    draw = ImageDraw.Draw(bg)
     
     font_header = get_font(34)
-    cyber_draw.text((70, 65), header_text, fill="#FFFFFF", font=font_header)
+    draw.text((70, 65), header_text, fill="#00E5FF" if mode == "ENCARGO" else "#FFFFFF", font=font_header)
     
     card_w, card_h = 860, 860
     card_x, card_y = (canvas_w - card_w) // 2, 400
@@ -148,8 +147,6 @@ def create_story_template(product, img_obj):
     img_copy.thumbnail((760, 760))
     p_w, p_h = img_copy.size
     bg.paste(img_copy, (card_x + (card_w - p_w) // 2, card_y + (card_h - p_h) // 2), img_copy if img_copy.mode == "RGBA" else None)
-    
-    draw = ImageDraw.Draw(bg)
     
     logo_path = os.path.join(os.path.dirname(__file__), "logo_canva.png")
     if os.path.exists(logo_path):
@@ -178,8 +175,8 @@ def create_story_template(product, img_obj):
     draw.rounded_rectangle((badge_x1, badge_y1, badge_x1 + badge_w, badge_y1 + badge_h), radius=25, fill=(18, 22, 28, 240), outline=accent_color, width=3)
     draw.text((canvas_w // 2, badge_y1 + badge_h // 2 - 3), price_str, fill=accent_color, font=font_price, anchor="mm")
     
-    # LEYENDA AUTOMÁTICA DE LINK EN BIO
-    draw.text((70, canvas_h - 110), "🔗 COMPRÁ CON EL LINK EN BIO O ESCRIBINOS POR PRIVADO", fill="#00E5FF", font=get_font(25))
+    footer_text = "📩 PEDILO A PEDIDO POR PRIVADO" if mode == "ENCARGO" else "🔗 COMPRÁ EN EL LINK DE LA BIO"
+    draw.text((70, canvas_h - 110), footer_text, fill="#00E5FF", font=get_font(25))
     draw.text((70, canvas_h - 65), "@CUANTICOPC", fill="#FFFFFF", font=get_font(32))
     
     output_path = f"story_{product['id']}.jpg"
@@ -187,16 +184,14 @@ def create_story_template(product, img_obj):
     return output_path
 
 def publish_to_instagram(image_url):
-    """Envía la imagen a Instagram mediante Meta API."""
     if not IG_USER_ID or not ACCESS_TOKEN:
         return False, "Faltan credenciales de Instagram"
-        
+    
     container_url = f"https://graph.facebook.com/v26.0/{IG_USER_ID}/media"
     payload = {"image_url": image_url, "media_type": "STORIES", "access_token": ACCESS_TOKEN}
     
     res = requests.post(container_url, data=payload)
     res_data = res.json()
-    
     if "id" not in res_data:
         return False, res_data
         
@@ -211,52 +206,86 @@ def publish_to_instagram(image_url):
         return True, pub_data["id"]
     return False, pub_data
 
-def process_catalog():
-    products = fetch_all_valid_products()
-    if not products:
-        if bot and TELEGRAM_CHAT_ID:
-            bot.send_message(TELEGRAM_CHAT_ID, "❌ No se encontraron productos válidos.")
+def interactive_process():
+    if not bot or not TELEGRAM_CHAT_ID:
+        print("Bot Token o Chat ID faltante")
         return
 
-    # Si se ejecuta por Action manual o Cron, tomamos un producto o procesamos lote
-    product = random.choice(products) # Publica 1 producto aleatorio por ejecución
-    
-    if bot and TELEGRAM_CHAT_ID:
-        bot.send_message(TELEGRAM_CHAT_ID, f"🚀 *Procesando producto:* {product['original_name']}\n💰 {product['price']}", parse_mode="Markdown")
+    products = fetch_all_valid_products()
+    if not products:
+        bot.send_message(TELEGRAM_CHAT_ID, "⚠️ No hay productos disponibles en stock activo.")
+        return
 
+    # Selección aleatoria de 1 producto para validar en esta corrida
+    product = random.choice(products)
+    
     try:
         img_res = requests.get(product["raw_url"], headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-        if img_res.status_code == 200:
-            img_obj = Image.open(BytesIO(img_res.content)).convert("RGB")
-            product["ai_name"] = generate_ai_title(product["original_name"])
+        if img_res.status_code != 200:
+            return
             
-            image_path = create_story_template(product, img_obj)
-            
-            # Notificación a Telegram con la imagen generada
-            if bot and TELEGRAM_CHAT_ID:
-                with open(image_path, "rb") as photo:
-                    bot.send_photo(
-                        TELEGRAM_CHAT_ID, 
-                        photo, 
-                        caption=f"📸 *Story Generada e Intentando Publicación*\n📦 {product['original_name']}\n💰 {product['price']}\n🔗 Link: {product['permalink']}", 
-                        parse_mode="Markdown"
-                    )
-            
-            # Publicación directa en Instagram
-            success, result = publish_to_instagram(product["raw_url"])
-            
-            if success:
-                msg = f"🎉 ¡Publicado exitosamente en Instagram Stories! (ID: `{result}`)"
-            else:
-                msg = f"⚠️ Generado pero error en API Instagram: `{result}`"
+        img_obj = Image.open(BytesIO(img_res.content)).convert("RGB")
+        product["ai_name"] = generate_ai_title(product["original_name"])
+        image_path = create_story_template(product, img_obj)
+        
+        # Botones interactivos
+        markup = InlineKeyboardMarkup(row_width=2)
+        btn_approve = InlineKeyboardButton("✅ Publicar (Stock)", callback_data=f"pub_{product['id']}")
+        btn_order = InlineKeyboardButton("📦 Publicar (A Pedido)", callback_data=f"ord_{product['id']}")
+        btn_skip = InlineKeyboardButton("⏩ Saltear", callback_data="skip")
+        markup.add(btn_approve, btn_order, btn_skip)
+        
+        with open(image_path, "rb") as photo:
+            msg = bot.send_photo(
+                TELEGRAM_CHAT_ID, 
+                photo, 
+                caption=f"¿Publicar esta Story?\n\n📦 *{product['original_name']}*\n💰 {product['price']}\n🔗 [Ver en la web]({product['permalink']})", 
+                parse_mode="Markdown",
+                reply_markup=markup
+            )
+        
+        # Espera activa de respuesta dentro del tiempo límite seguro
+        user_action = {"done": False}
+
+        @bot.callback_query_handler(func=lambda call: True)
+        def handle_query(call):
+            if call.data.startswith("pub_"):
+                bot.edit_message_caption("⏳ Publicando en Instagram Stories...", chat_id=call.message.chat.id, message_id=call.message.message_id)
+                success, result = publish_to_instagram(product["raw_url"])
+                if success:
+                    bot.send_message(call.message.chat.id, f"🎉 ¡Publicado con éxito! ID: `{result}`", parse_mode="Markdown")
+                else:
+                    bot.send_message(call.message.chat.id, f"❌ Error en API Instagram: `{result}`", parse_mode="Markdown")
+            elif call.data.startswith("ord_"):
+                bot.edit_message_caption("⏳ Generando y Publicando versión 'A Pedido'...", chat_id=call.message.chat.id, message_id=call.message.message_id)
+                new_image_path = create_story_template(product, img_obj, mode="ENCARGO")
+                success, result = publish_to_instagram(product["raw_url"])
+                if success:
+                    bot.send_message(call.message.chat.id, f"🎉 ¡Publicado modo 'A Pedido'! ID: `{result}`", parse_mode="Markdown")
+                else:
+                    bot.send_message(call.message.chat.id, f"❌ Error en API Instagram: `{result}`", parse_mode="Markdown")
+            elif call.data == "skip":
+                bot.edit_message_caption("⏩ Publicación salteada por el usuario.", chat_id=call.message.chat.id, message_id=call.message.message_id)
                 
-            if bot and TELEGRAM_CHAT_ID:
-                bot.send_message(TELEGRAM_CHAT_ID, msg, parse_mode="Markdown")
-                
-            if os.path.exists(image_path):
-                os.remove(image_path)
+            user_action["done"] = True
+
+        # Polling limitado de 180 segundos para darte tiempo a responder en Telegram sin colgar GitHub
+        start_time = time.time()
+        while not user_action["done"] and (time.time() - start_time) < 180:
+            try:
+                bot.get_updates(offset=-1, timeout=2)
+            except Exception:
+                pass
+            time.sleep(1)
+
+        if not user_action["done"]:
+            bot.edit_message_caption("⏱️ Tiempo de espera agotado sin acción.", chat_id=TELEGRAM_CHAT_ID, message_id=msg.message_id)
+            
+        if os.path.exists(image_path):
+            os.remove(image_path)
+
     except Exception as e:
-        print(f"Error durante el proceso: {e}")
+        print(f"Error procesando producto: {e}")
 
 if __name__ == "__main__":
-    process_catalog()
+    interactive_process()
