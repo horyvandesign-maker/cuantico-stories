@@ -76,9 +76,9 @@ def generate_ai_title(original_title):
 
 def fetch_all_catalog_products():
     """
-    Lee todo el catálogo y clasifica estrictamente por estado de stock real.
-    Si stock_status != 'instock' o is_in_stock == False, lo fuerza como 'POR ENCARGUE'
-    sin importar el precio en base de datos.
+    Lee todo el catálogo.
+    Regla estricta: Si stock no es instock O si el precio == 0 / vacio,
+    fuerza como 'POR ENCARGUE'.
     """
     endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
     headers = {
@@ -105,29 +105,28 @@ def fetch_all_catalog_products():
             if not images:
                 continue
 
-            # Verificación del stock real
-            stock_status = product.get("stock_status", "")
+            stock_status = str(product.get("stock_status", "")).lower()
             is_in_stock = product.get("is_in_stock", True)
-            backorders_allowed = product.get("backorders_allowed", False)
             
-            # Evaluación: Si no está en stock, inmediatamente pasa a "Por Encargue"
-            is_on_demand = False
-            if not is_in_stock or stock_status in ["outofstock", "onbackorder"] or backorders_allowed:
-                is_on_demand = True
-
             prices_info = product.get("prices", {})
             raw_price = prices_info.get("price")
+            
+            # Parseo numérico seguro del precio
+            price_val = 0
+            if raw_price is not None:
+                try:
+                    price_val = int(raw_price)
+                except ValueError:
+                    price_val = 0
 
-            # Regla de asignación de precio
-            if is_on_demand:
+            # SI NO HAY STOCK REAL O EL PRECIO ES <= 0 -> POR ENCARGUE
+            if not is_in_stock or stock_status != "instock" or price_val <= 0:
+                is_on_demand = True
                 formatted_price = "POR ENCARGUE"
             else:
-                if raw_price and str(raw_price).isdigit() and int(raw_price) > 0:
-                    val_final = int(raw_price) / 100
-                    formatted_price = f"${val_final:,.0f}".replace(",", ".")
-                else:
-                    is_on_demand = True
-                    formatted_price = "POR ENCARGUE"
+                is_on_demand = False
+                val_final = price_val / 100
+                formatted_price = f"${val_final:,.0f}".replace(",", ".")
 
             catalog.append({
                 "id": product.get("id"),
