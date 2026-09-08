@@ -18,18 +18,15 @@ ACCESS_TOKEN = os.environ.get("INSTAGRAM_ACCESS_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 SITE_URL = "https://cuanticopc.com.ar"
-bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
+bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN) if TELEGRAM_BOT_TOKEN else None
 
-# Paleta de colores dinámicos
 ACCENT_COLORS = ["#00FF88", "#00E5FF", "#B000FF"]
-ON_DEMAND_COLOR = "#FFB703" # Color dorado/ámbar para productos por encargue
+ON_DEMAND_COLOR = "#FFB703"
 
-# Variable global para capturar la respuesta del usuario sin duplicar handlers
 user_choice = {"action": None}
 
 @bot.callback_query_handler(func=lambda call: True)
 def global_callback_listener(call):
-    """Maneja las interacciones de los botones de forma global."""
     if call.data.startswith("approve_"):
         user_choice["action"] = "approve"
         bot.answer_callback_query(call.id, "Publicando...")
@@ -46,7 +43,6 @@ def global_callback_listener(call):
     bot.stop_polling()
 
 def get_font(size):
-    """Obtiene una tipografía vectorial escalable preinstalada en Linux."""
     try:
         return ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", size)
     except Exception:
@@ -56,15 +52,12 @@ def get_font(size):
             return ImageFont.load_default()
 
 def clean_text(text):
-    """Limpia caracteres especiales e inconsistencias de código HTML."""
     decoded = html.unescape(text)
     return decoded.replace('"', "'").replace("”", "'").strip()
 
 def generate_ai_title(original_title):
-    """Usa la API de Gemini para redactar un gancho comercial breve."""
     if not GEMINI_API_KEY:
         return original_title
-        
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
         prompt = (
@@ -79,11 +72,11 @@ def generate_ai_title(original_title):
         ai_text = response.text.strip().replace('"', '')
         return ai_text if len(ai_text) > 3 else original_title
     except Exception as e:
-        print(f"Fallback a título original por error en IA: {e}")
+        print(f"Fallback a título original: {e}")
         return original_title
 
 def fetch_all_valid_products():
-    """Obtiene todos los productos y determina si van con precio normal o 'POR ENCARGUE'."""
+    """Detecta con precisión productos pausados, sin precio o marcados como reserva."""
     endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
@@ -95,12 +88,7 @@ def fetch_all_valid_products():
     page = 1
     
     while True:
-        params = {
-            "per_page": 50,
-            "page": page,
-            "_nocache": int(time.time())
-        }
-        
+        params = {"per_page": 50, "page": page, "_nocache": int(time.time())}
         res = requests.get(endpoint, params=params, headers=headers, timeout=15)
         if res.status_code != 200 or not res.json():
             break
@@ -117,23 +105,25 @@ def fetch_all_valid_products():
             status = product.get("status", "publish")
             stock_status = product.get("stock_status", "")
             is_in_stock = product.get("is_in_stock", True)
-            backorders_allowed = product.get("backorders_allowed", False) or product.get("permalink", "")
             
+            # Revisar si WooSync u otro plugin lo marca como pausado en el texto del producto
+            description_raw = str(product.get("description", "")).lower()
+            name_raw = str(product.get("name", "")).lower()
+            
+            is_on_demand = False
+            
+            # 1. Filtro estricto: Si la gestión de stock indica 'onbackorder', sin stock o no publicado
+            if status != "publish" or stock_status in ["outofstock", "onbackorder"] or not is_in_stock:
+                is_on_demand = True
+
+            # 2. Si el precio en la API viene como 0, nulo o vacío
             prices_info = product.get("prices", {})
             raw_price = prices_info.get("price")
             
-            # Criterio para detectar si debe ser "POR ENCARGUE"
-            is_on_demand = False
-            
-            # 1. Si está pausado/borrador, o sin stock pero se puede reservar
-            if status != "publish" or stock_status == "outofstock" or not is_in_stock:
-                is_on_demand = True
-            
-            # 2. Validar precio
             formatted_price = "POR ENCARGUE"
+            
             if not is_on_demand and raw_price and str(raw_price).isdigit() and int(raw_price) > 0:
-                val_num = int(raw_price)
-                val_final = val_num / 100
+                val_final = int(raw_price) / 100
                 if val_final > 0:
                     formatted_price = f"${val_final:,.0f}".replace(",", ".")
                 else:
@@ -155,22 +145,19 @@ def fetch_all_valid_products():
     return valid_products
 
 def draw_vertical_gradient(draw_obj, rect, color_top, color_bottom):
-    """Dibuja un degradado vertical suave."""
     x1, y1, x2, y2 = rect
     height = y2 - y1
     for i in range(height):
         ratio = i / float(height)
         r = int(color_top[0] * (1 - ratio) + color_bottom[0] * ratio)
         g = int(color_top[1] * (1 - ratio) + color_bottom[1] * ratio)
-        b = int(color_top[2] * (1 - ratio) + color_bottom[2] * ratio)
+        b = int(color_top[2] * (1 - ratio) + color_bottom[3] * ratio)
         a = int(color_top[3] * (1 - ratio) + color_bottom[3] * ratio)
         draw_obj.line([(x1, y1 + i), (x2, y1 + i)], fill=(r, g, b, a))
 
 def create_story_template(product, img_obj):
-    """Genera la plantilla adaptando la cápsula según si tiene precio publicado o es por encargue."""
     canvas_w, canvas_h = 1080, 1920
     
-    # Selecciona color de acento según disponibilidad
     if product["is_on_demand"]:
         accent_color = ON_DEMAND_COLOR
         display_label = "📦 PRODUCTO POR ENCARGUE"
@@ -178,19 +165,16 @@ def create_story_template(product, img_obj):
         accent_color = random.choice(ACCENT_COLORS)
         display_label = product["price"]
     
-    # 1. Fondo difuminado
     bg = img_obj.resize((canvas_w, canvas_h)).filter(ImageFilter.GaussianBlur(50))
     overlay = Image.new("RGBA", (canvas_w, canvas_h), (12, 12, 18, 160))
     bg.paste(overlay, (0, 0), overlay)
     
-    # 2. Gradientes de sombra
     gradient_layer = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     g_draw = ImageDraw.Draw(gradient_layer)
     draw_vertical_gradient(g_draw, (0, 0, canvas_w, 350), (0, 0, 0, 210), (0, 0, 0, 0))
     draw_vertical_gradient(g_draw, (0, canvas_h - 350, canvas_w, canvas_h), (0, 0, 0, 0), (0, 0, 0, 230))
     bg.paste(gradient_layer, (0, 0), gradient_layer)
     
-    # 3. Tarjeta para el producto
     card_w, card_h = 860, 860
     card_x = (canvas_w - card_w) // 2
     card_y = 420
@@ -211,15 +195,12 @@ def create_story_template(product, img_obj):
     
     draw = ImageDraw.Draw(bg)
     
-    # 4. Render del Logo
     logo_path = os.path.join(os.path.dirname(__file__), "logo_canva.png")
-    
     if os.path.exists(logo_path):
         try:
             logo_img = Image.open(logo_path).convert("RGBA")
             logo_img.thumbnail((550, 220))
             l_w, l_h = logo_img.size
-            
             positions = ["left", "center", "right"]
             chosen_pos = random.choice(positions)
             
@@ -233,28 +214,18 @@ def create_story_template(product, img_obj):
             logo_y = 110
             bg.paste(logo_img, (logo_x, logo_y), logo_img)
         except Exception as e:
-            print(f"Error procesando el logo: {e}")
             draw.text((canvas_w // 2, 160), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
     else:
         draw.text((canvas_w // 2, 160), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
     
-    # 5. Título del producto
     font_title = get_font(42)
     wrapped_lines = textwrap.wrap(product["ai_name"], width=22)
     wrapped_text = "\n".join(wrapped_lines[:3])
     
     title_y = card_y + card_h + 90
-    draw.multiline_text(
-        (canvas_w // 2, title_y), 
-        wrapped_text, 
-        fill="#FFFFFF", 
-        font=font_title, 
-        anchor="mm", 
-        align="center"
-    )
+    draw.multiline_text((canvas_w // 2, title_y), wrapped_text, fill="#FFFFFF", font=font_title, anchor="mm", align="center")
     
-    # 6. Cápsula del Precio / Por Encargue
-    font_size = 46 if product["is_on_demand"] else 58
+    font_size = 44 if product["is_on_demand"] else 58
     font_badge = get_font(font_size)
     
     bbox = draw.textbbox((0, 0), display_label, font=font_badge)
@@ -274,7 +245,6 @@ def create_story_template(product, img_obj):
     draw.rounded_rectangle((badge_x1, badge_y1, badge_x2, badge_y2), radius=25, fill=(18, 22, 28, 240), outline=accent_color, width=3)
     draw.text(((badge_x1 + badge_x2) // 2, (badge_y1 + badge_y2) // 2 - 3), display_label, fill=accent_color, font=font_badge, anchor="mm")
     
-    # 7. Marca de agua inferior
     font_footer = get_font(38)
     draw.text((canvas_w // 2, canvas_h - 140), "cuanticopc.com.ar", fill="#DDDDDD", font=font_footer, anchor="mm")
     
@@ -283,13 +253,8 @@ def create_story_template(product, img_obj):
     return output_path
 
 def publish_to_instagram(image_url):
-    """Envía la publicación mediante la API de Meta Graph."""
     container_url = f"https://graph.facebook.com/v26.0/{IG_USER_ID}/media"
-    payload = {
-        "image_url": image_url,
-        "media_type": "STORIES",
-        "access_token": ACCESS_TOKEN
-    }
+    payload = {"image_url": image_url, "media_type": "STORIES", "access_token": ACCESS_TOKEN}
     
     res = requests.post(container_url, data=payload)
     res_data = res.json()
@@ -301,12 +266,7 @@ def publish_to_instagram(image_url):
     time.sleep(5)
     
     publish_url = f"https://graph.facebook.com/v26.0/{IG_USER_ID}/media_publish"
-    pub_payload = {
-        "creation_id": container_id,
-        "access_token": ACCESS_TOKEN
-    }
-    
-    pub_res = requests.post(publish_url, data=pub_payload)
+    pub_res = requests.post(publish_url, data={"creation_id": container_id, "access_token": ACCESS_TOKEN})
     pub_data = pub_res.json()
     
     if "id" in pub_data:
@@ -314,7 +274,6 @@ def publish_to_instagram(image_url):
     return False, pub_data
 
 def process_catalog():
-    """Recorre la lista de productos pidiendo aprobación interactiva en Telegram."""
     products = fetch_all_valid_products()
     if not products:
         bot.send_message(TELEGRAM_CHAT_ID, "❌ No se encontraron productos para procesar.")
@@ -354,7 +313,6 @@ def process_catalog():
                 msg = bot.send_photo(TELEGRAM_CHAT_ID, photo, caption=caption, reply_markup=markup, parse_mode="Markdown")
                 
             user_choice["action"] = None
-            
             bot.polling(timeout=300, non_stop=False)
             
             if os.path.exists(image_path):
