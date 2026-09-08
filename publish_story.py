@@ -8,17 +8,20 @@ from io import BytesIO
 from PIL import Image, ImageFilter, ImageDraw, ImageFont
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from google import genai
 
+# Carga de credenciales y configuración
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 IG_USER_ID = os.environ.get("IG_USER_ID")
 ACCESS_TOKEN = os.environ.get("INSTAGRAM_ACCESS_TOKEN")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 SITE_URL = "https://cuanticopc.com.ar"
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
 def get_font(size):
-    """Obtiene una tipografía escalable garantizada del sistema Linux."""
+    """Obtiene una tipografía vectorial escalable preinstalada en Linux."""
     try:
         return ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", size)
     except Exception:
@@ -28,12 +31,34 @@ def get_font(size):
             return ImageFont.load_default()
 
 def clean_text(text):
-    """Limpia caracteres especiales e inconsistencias de HTML."""
+    """Limpia caracteres especiales e inconsistencias de código HTML."""
     decoded = html.unescape(text)
     return decoded.replace('"', "'").replace("”", "'").strip()
 
+def generate_ai_title(original_title):
+    """Usa la API de Gemini para redactar un gancho comercial breve."""
+    if not GEMINI_API_KEY:
+        return original_title
+        
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        prompt = (
+            f"Transforma este título técnico de producto de computación en un texto comercial "
+            f"atractivo y conciso para una Instagram Story (máximo 7 palabras, sin emojis, sin comillas):\n\n"
+            f"Producto: {original_title}"
+        )
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+        )
+        ai_text = response.text.strip().replace('"', '')
+        return ai_text if len(ai_text) > 3 else original_title
+    except Exception as e:
+        print(f"Fallback a título original por error en IA: {e}")
+        return original_title
+
 def get_product_and_image():
-    """Obtiene un producto activo desde WooCommerce y detecta si es por reserva/encargo."""
+    """Consulta WooCommerce, detecta si es por encargo/reserva y descarga la imagen."""
     endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     
@@ -56,24 +81,24 @@ def get_product_and_image():
             if img_res.status_code == 200:
                 img_orig = Image.open(BytesIO(img_res.content)).convert("RGB")
                 
-                # Detectar si se puede reservar / por encargo / backorder
+                # Validación de stock / reservas / encargo
                 is_on_backorder = product.get("is_on_backorder", False)
                 stock_status = product.get("stock_status", "")
-                
                 price_raw = product.get("prices", {}).get("price", "0")
                 is_on_demand = False
                 
-                # Si está marcado como reserva, backorder, o vale $0 -> SIN PRECIO
                 if is_on_backorder or stock_status == "onbackorder" or not str(price_raw).isdigit() or int(price_raw) == 0:
                     is_on_demand = True
                     price = "¡DISPONIBLE POR ENCARGO!"
                 else:
                     price = f"${int(price_raw) / 100:,.0f}".replace(",", ".")
                 
-                raw_name = product.get("name", "Producto Cuantico")
+                raw_name = clean_text(product.get("name", "Producto Cuantico"))
+                ai_name = generate_ai_title(raw_name)
                 
                 return {
-                    "name": clean_text(raw_name),
+                    "name": ai_name,
+                    "original_name": raw_name,
                     "price": price,
                     "is_on_demand": is_on_demand,
                     "img_obj": img_orig,
@@ -84,41 +109,40 @@ def get_product_and_image():
 
     print("No se encontró ningún producto con imagen procesable.")
     exit(1)
-    
+
 def create_story_template(product):
-    """Genera el lienzo vertical de 1080x1920 px con textos formateados."""
+    """Genera la plantilla visual de 1080x1920 px con encuadre, fuentes e IA."""
     canvas_w, canvas_h = 1080, 1920
     img_orig = product["img_obj"]
     
-    # 1. Fondo Oscuro
+    # 1. Fondo Oscuro con Blur
     bg = img_orig.resize((canvas_w, canvas_h))
     bg = bg.filter(ImageFilter.GaussianBlur(40))
     
     overlay = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 180))
     bg.paste(overlay, (0, 0), overlay)
     
-    # 2. Rescalar e Insertar Imagen
+    # 2. Rescalar y centrar la foto del producto
     img_orig.thumbnail((800, 800))
     p_w, p_h = img_orig.size
     offset_x = (canvas_w - p_w) // 2
     offset_y = (canvas_h - p_h) // 2 - 120
     bg.paste(img_orig, (offset_x, offset_y))
     
-    # 3. Dibujar Elementos de Marca y Texto
+    # 3. Dibujar textos y marca
     draw = ImageDraw.Draw(bg)
     
     font_brand = get_font(50)
-    font_title = get_font(42)
+    font_title = get_font(44)
     font_price = get_font(65) if not product["is_on_demand"] else get_font(45)
     font_footer = get_font(38)
     
-    # Encabezado Marca
+    # Encabezado
     draw.text((canvas_w // 2, 160), "CUANTICO PC", fill="#FFFFFF", font=font_brand, anchor="mm")
     
-    # Nombre del producto multilínea (evita recortes)
-    raw_title = product["name"]
-    wrapped_lines = textwrap.wrap(raw_title, width=26)
-    wrapped_text = "\n".join(wrapped_lines[:3]) # Hasta 3 líneas centradas
+    # Título optimizado por IA en multilínea centrada
+    wrapped_lines = textwrap.wrap(product["name"], width=24)
+    wrapped_text = "\n".join(wrapped_lines[:3])
     
     draw.multiline_text(
         (canvas_w // 2, offset_y + p_h + 100), 
@@ -129,10 +153,10 @@ def create_story_template(product):
         align="center"
     )
     
-    # Precio o Estado "Por Encargo"
+    # Precio o leyenda por encargo
     draw.text((canvas_w // 2, offset_y + p_h + 230), product["price"], fill="#00FF88", font=font_price, anchor="mm")
     
-    # Pie de página / Web
+    # Marca de agua inferior
     draw.text((canvas_w // 2, canvas_h - 180), "cuanticopc.com.ar", fill="#CCCCCC", font=font_footer, anchor="mm")
     
     output_path = "story_preview.jpg"
@@ -140,7 +164,7 @@ def create_story_template(product):
     return output_path
 
 def publish_to_instagram(image_url):
-    """Publica en Instagram API."""
+    """Envía la publicación mediante la API de Meta Graph."""
     container_url = f"https://graph.facebook.com/v26.0/{IG_USER_ID}/media"
     payload = {
         "image_url": image_url,
@@ -171,6 +195,7 @@ def publish_to_instagram(image_url):
     return False, pub_data
 
 def process_workflow():
+    """Ejecuta el ciclo de creación, envío a Telegram y captura de aprobación."""
     product = get_product_and_image()
     image_path = create_story_template(product)
     
@@ -180,12 +205,12 @@ def process_workflow():
         InlineKeyboardButton("🔄 Probar otro", callback_data="retry")
     )
     
-    caption = f"📦 *{product['name']}*\n💰 Precio: {product['price']}\n\n¿Aprobás esta imagen para Instagram Stories?"
+    caption = f"📦 *{product['original_name']}*\n💰 Precio: {product['price']}\n\n¿Aprobás esta imagen para Instagram Stories?"
     
     with open(image_path, "rb") as photo:
         msg = bot.send_photo(TELEGRAM_CHAT_ID, photo, caption=caption, reply_markup=markup, parse_mode="Markdown")
         
-    print("Esperando la respuesta en Telegram por 120 segundos...")
+    print("Esperando respuesta en Telegram por 120 segundos...")
     
     @bot.callback_query_handler(func=lambda call: True)
     def callback_listener(call):
