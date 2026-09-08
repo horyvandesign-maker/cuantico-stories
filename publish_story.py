@@ -20,7 +20,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 SITE_URL = "https://cuanticopc.com.ar"
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
-# Paleta de colores neón
+# Paleta de colores neón y etiquetas
 ACCENT_COLORS = ["#00FF88", "#00E5FF", "#B000FF", "#FF007F"]
 HEADER_TAGS = ["NUEVO INGRESO", "OFERTA DESTACADA", "STOCK DISPONIBLE", "EQUIPO GAMER"]
 
@@ -62,7 +62,7 @@ def generate_ai_title(original_title):
         return original_title
 
 def fetch_all_valid_products():
-    """Obtiene todos los productos validando de forma estricta stock y precio directo sin caché."""
+    """Obtiene todos los productos validando stock, precio y extrayendo su permalink."""
     endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
@@ -120,6 +120,7 @@ def fetch_all_valid_products():
                 "id": product.get("id"),
                 "original_name": clean_text(product.get("name", "Producto Cuantico")),
                 "price": formatted_price,
+                "permalink": product.get("permalink", SITE_URL),
                 "raw_url": images[0].get("src", "")
             })
             
@@ -177,15 +178,13 @@ def draw_geometric_polygons(draw_obj, side="right", accent_hex="#00E5FF"):
 def draw_circuit_lines(draw_obj):
     """Dibuja circuitos ciberestéticos vectoriales en las esquinas."""
     color = (0, 229, 255, 140)
-    # Esquina superior derecha
     draw_obj.line([(850, 0), (850, 150), (950, 250), (950, 320)], fill=color, width=3)
     draw_obj.ellipse([942, 312, 958, 328], fill=color)
-    # Esquina inferior izquierda
     draw_obj.line([(120, 1500), (120, 1700), (220, 1800), (220, 1920)], fill=color, width=3)
     draw_obj.ellipse([112, 1492, 128, 1508], fill=color)
 
 def create_story_template(product, img_obj):
-    """Genera la plantilla con estructura de producto."""
+    """Genera la plantilla con leyenda 100% automática de Link en Bio."""
     canvas_w, canvas_h = 1080, 1920
     accent_color = random.choice(ACCENT_COLORS)
     header_text = random.choice(HEADER_TAGS)
@@ -281,10 +280,11 @@ def create_story_template(product, img_obj):
     draw.rounded_rectangle((badge_x1, badge_y1, badge_x2, badge_y2), radius=25, fill=(18, 22, 28, 240), outline=accent_color, width=3)
     draw.text(((badge_x1 + badge_x2) // 2, (badge_y1 + badge_y2) // 2 - 3), price_str, fill=accent_color, font=font_price, anchor="mm")
     
+    # 8. Pie de página comercial automático con llamado a la acción (CTA)
     font_footer_sub = get_font(26)
     font_footer_main = get_font(32)
-    draw.text((70, canvas_h - 100), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", fill="#AAAAAA", font=font_footer_sub)
-    draw.text((70, canvas_h - 60), "@CUANTICOPC", fill="#FFFFFF", font=font_footer_main)
+    draw.text((70, canvas_h - 110), "🔗 COMPRÁ CON EL LINK EN BIO O ESCRIBINOS POR PRIVADO", fill="#00E5FF", font=font_footer_sub)
+    draw.text((70, canvas_h - 65), "@CUANTICOPC", fill="#FFFFFF", font=font_footer_main)
     
     output_path = f"story_{product['id']}.jpg"
     bg.save(output_path, "JPEG", quality=95)
@@ -302,7 +302,6 @@ def create_generic_promo_story(promo_id=1):
     
     draw = ImageDraw.Draw(bg)
     
-    # 1. Logo superior
     logo_path = os.path.join(os.path.dirname(__file__), "logo_canva.png")
     if os.path.exists(logo_path):
         try:
@@ -312,15 +311,12 @@ def create_generic_promo_story(promo_id=1):
         except Exception:
             pass
             
-    # 2. Dibujar Circuitos Vectoriales estilo Branding
     draw_circuit_lines(draw)
     draw_geometric_polygons(draw, side="right", accent_hex="#00E5FF")
 
-    # 3. Textos Institucionales
     draw.text((canvas_w // 2, 480), "TU TECNOLOGÍA", fill="#FFFFFF", font=get_font(60), anchor="mm")
     draw.text((canvas_w // 2, 560), "NUESTRA EXPERIENCIA", fill="#00E5FF", font=get_font(52), anchor="mm")
 
-    # 4. Bloque de servicios/categorías
     services_y = 700
     services = [
         "💻  Notebooks",
@@ -332,7 +328,6 @@ def create_generic_promo_story(promo_id=1):
         draw.text((120, services_y), s, fill="#DDDDDD", font=get_font(38))
         services_y += 75
 
-    # 5. Bloque de beneficios comerciales
     benefits_y = 1150
     draw.text((120, benefits_y - 80), "VENTA ONLINE Y PRESENCIAL", fill="#00FF88", font=get_font(36))
     
@@ -346,9 +341,8 @@ def create_generic_promo_story(promo_id=1):
         draw.text((120, benefits_y), b, fill="#FFFFFF", font=get_font(34))
         benefits_y += 70
 
-    # 6. Pie de página comercial
     draw.text((canvas_w // 2, canvas_h - 160), "ESCRIBINOS Y TE ASESORAMOS SIN COMPROMISO", fill="#00E5FF", font=get_font(30), anchor="mm")
-    draw.text((canvas_w // 2, canvas_h - 90), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS | @CUANTICOPC", fill="#AAAAAA", font=get_font(24), anchor="mm")
+    draw.text((canvas_w // 2, canvas_h - 90), "LINK EN BIO Y OFERTAS EN @CUANTICOPC", fill="#AAAAAA", font=get_font(24), anchor="mm")
 
     output_path = f"promo_story_{promo_id}_{int(time.time())}.jpg"
     bg.save(output_path, "JPEG", quality=95)
@@ -397,11 +391,10 @@ def process_catalog():
     
     bot.send_message(TELEGRAM_CHAT_ID, f"🚀 *Iniciando revisión de catálogo completo* ({total} productos encontrados).", parse_mode="Markdown")
 
-    # Frecuencia de intercalado (Ej: cada 4 productos se propone 1 placa genérica)
     PROMO_EVERY_N_PRODUCTS = 4
 
     for index, prod in enumerate(products, start=1):
-        # --- INTERCALAR PLACA GENÉRICA / PROMOCIONAL ---
+        # --- INTERCALAR PLACA GENÉRICA ---
         if index > 1 and (index - 1) % PROMO_EVERY_N_PRODUCTS == 0:
             try:
                 promo_path = create_generic_promo_story(promo_id=index)
@@ -411,7 +404,7 @@ def process_catalog():
                     InlineKeyboardButton("⏭️ Saltear Promo", callback_data="skip_promo")
                 )
                 
-                caption_p = "📢 *[Placa Institucional / Promocional]*\n¿Publicar esta Story institucional para dar variedad al feed?"
+                caption_p = "📢 *[Placa Institucional / Promocional]*\n¿Publicar esta Story institucional?"
                 
                 with open(promo_path, "rb") as photo:
                     msg_p = bot.send_photo(TELEGRAM_CHAT_ID, photo, caption=caption_p, reply_markup=markup_p, parse_mode="Markdown")
@@ -433,7 +426,6 @@ def process_catalog():
                 bot.polling(timeout=300, non_stop=False)
                 
                 if promo_choice["action"] == "approve":
-                    # Nota: Para la API de Instagram Meta Graph se requiere URL accesible. Si usás URL directa pasás la imagen original o tu servidor web.
                     bot.send_message(TELEGRAM_CHAT_ID, "⚠️ *Tip:* Recuerda que Meta API requiere que la imagen esté alojada en una URL pública.", parse_mode="Markdown")
                 
                 if os.path.exists(promo_path):
@@ -462,7 +454,8 @@ def process_catalog():
             
             caption = (
                 f"📦 *[{index}/{total}] {prod['original_name']}*\n"
-                f"💰 Precio: {prod['price']}\n\n"
+                f"💰 Precio: {prod['price']}\n"
+                f"🔗 Link web: {prod['permalink']}\n\n"
                 f"¿Publicar esta Story?"
             )
             
