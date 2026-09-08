@@ -15,6 +15,7 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 IG_USER_ID = os.environ.get("IG_USER_ID")
 ACCESS_TOKEN = os.environ.get("INSTAGRAM_ACCESS_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+IMGBB_API_KEY = os.environ.get("IMGBB_API_KEY")  # Opcional: Clave gratuita de ImgBB para subir la plantilla
 
 SITE_URL = "https://cuanticopc.com.ar"
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN) if TELEGRAM_BOT_TOKEN else None
@@ -29,7 +30,7 @@ def global_callback_listener(call):
     if call.data.startswith("approve_"):
         user_choice["action"] = "approve"
         bot.answer_callback_query(call.id, "Publicando...")
-        bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption="🚀 *Publicando en Instagram Stories...*", parse_mode="Markdown")
+        bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption="🚀 *Publicando diseño final en Instagram Stories...*", parse_mode="Markdown")
     elif call.data.startswith("skip_"):
         user_choice["action"] = "skip"
         bot.answer_callback_query(call.id, "Salteado.")
@@ -75,11 +76,6 @@ def generate_ai_title(original_title):
         return original_title
 
 def fetch_all_catalog_products():
-    """
-    Lee todo el catálogo.
-    Regla estricta: Si stock no es instock O si el precio == 0 / vacio,
-    fuerza como 'POR ENCARGUE'.
-    """
     endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
@@ -111,7 +107,6 @@ def fetch_all_catalog_products():
             prices_info = product.get("prices", {})
             raw_price = prices_info.get("price")
             
-            # Parseo numérico seguro del precio
             price_val = 0
             if raw_price is not None:
                 try:
@@ -119,7 +114,6 @@ def fetch_all_catalog_products():
                 except ValueError:
                     price_val = 0
 
-            # SI NO HAY STOCK REAL O EL PRECIO ES <= 0 -> POR ENCARGUE
             if not is_in_stock or stock_status != "instock" or price_val <= 0:
                 is_on_demand = True
                 formatted_price = "POR ENCARGUE"
@@ -248,9 +242,42 @@ def create_story_template(product, img_obj):
     bg.save(output_path, "JPEG", quality=95)
     return output_path
 
-def publish_to_instagram(image_url):
+def upload_local_image_to_web(local_filepath):
+    """
+    Sube la imagen armada localmente a un servicio de hosting temporal público (ImgBB)
+    para que la API de Meta pueda descargarla con una URL válida.
+    """
+    if IMGBB_API_KEY:
+        try:
+            with open(local_filepath, "rb") as file:
+                res = requests.post("https://api.imgbb.com/1/upload", data={"key": IMGBB_API_KEY}, files={"image": file})
+                data = res.json()
+                if data.get("success"):
+                    return data["data"]["url"]
+        except Exception as e:
+            print(f"Error subiendo a ImgBB: {e}")
+
+    # Fallback alternativo gratuito sin API Key (Catbox / free host)
+    try:
+        with open(local_filepath, "rb") as file:
+            res = requests.post("https://catbox.moe/user/api.php", data={"reqtype": "fileupload"}, files={"fileToUpload": file})
+            if res.status_code == 200 and res.text.startswith("http"):
+                return res.text.strip()
+    except Exception as e:
+        print(f"Error subiendo a hosting temporal: {e}")
+
+    return None
+
+def publish_to_instagram(local_image_path):
+    # 1. Subimos la plantilla JPG armada localmente para tener una URL accesible por Meta
+    public_image_url = upload_local_image_to_web(local_image_path)
+    
+    if not public_image_url:
+        return False, "No se pudo obtener una URL pública para la plantilla armada."
+
+    # 2. Enviamos la URL de la plantilla procesada a la API Graph
     container_url = f"https://graph.facebook.com/v26.0/{IG_USER_ID}/media"
-    payload = {"image_url": image_url, "media_type": "STORIES", "access_token": ACCESS_TOKEN}
+    payload = {"image_url": public_image_url, "media_type": "STORIES", "access_token": ACCESS_TOKEN}
     
     res = requests.post(container_url, data=payload)
     res_data = res.json()
@@ -311,20 +338,23 @@ def process_catalog():
             user_choice["action"] = None
             bot.polling(timeout=300, non_stop=False)
             
-            if os.path.exists(image_path):
-                os.remove(image_path)
-                
             if user_choice["action"] == "approve":
-                success, result = publish_to_instagram(prod["raw_url"])
+                # AQUÍ SE PASA LA PLANTILLA LOCAL `image_path` EN LUGAR DE LA FOTO CRUDA DE WOOCOMMERCE
+                success, result = publish_to_instagram(image_path)
                 if success:
-                    bot.send_message(TELEGRAM_CHAT_ID, "🎉 ¡Publicado con éxito en Instagram Stories!", parse_mode="Markdown")
+                    bot.send_message(TELEGRAM_CHAT_ID, "🎉 ¡Publicado con éxito el diseño final en Instagram Stories!", parse_mode="Markdown")
                 else:
                     bot.send_message(TELEGRAM_CHAT_ID, f"❌ Error Meta: `{result}`", parse_mode="Markdown")
                 time.sleep(3)
                 
             elif user_choice["action"] == "stop":
                 bot.send_message(TELEGRAM_CHAT_ID, "🏁 *Proceso detenido.*", parse_mode="Markdown")
+                if os.path.exists(image_path):
+                    os.remove(image_path)
                 break
+
+            if os.path.exists(image_path):
+                os.remove(image_path)
                 
         except Exception as e:
             print(f"Error procesando producto {prod['id']}: {e}")
