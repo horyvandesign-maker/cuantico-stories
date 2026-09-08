@@ -76,7 +76,7 @@ def generate_ai_title(original_title):
         return original_title
 
 def fetch_all_valid_products():
-    """Detecta con precisión productos pausados, sin precio o marcados como reserva."""
+    """Forzado estricto: Si el producto está en reserva ('Se puede reservar') o sin stock, NUNCA muestra precio y siempre sale como POR ENCARGUE."""
     endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
@@ -105,31 +105,27 @@ def fetch_all_valid_products():
             status = product.get("status", "publish")
             stock_status = product.get("stock_status", "")
             is_in_stock = product.get("is_in_stock", True)
+            backorders_allowed = product.get("backorders_allowed", False)
             
-            # Revisar si WooSync u otro plugin lo marca como pausado en el texto del producto
-            description_raw = str(product.get("description", "")).lower()
-            name_raw = str(product.get("name", "")).lower()
-            
+            # Criterio absoluto para marcar POR ENCARGUE:
+            # Si no hay stock real o permite reservas ("Se puede reservar")
             is_on_demand = False
             
-            # 1. Filtro estricto: Si la gestión de stock indica 'onbackorder', sin stock o no publicado
-            if status != "publish" or stock_status in ["outofstock", "onbackorder"] or not is_in_stock:
+            if not is_in_stock or stock_status in ["outofstock", "onbackorder"] or backorders_allowed or status != "publish":
                 is_on_demand = True
-
-            # 2. Si el precio en la API viene como 0, nulo o vacío
+                
             prices_info = product.get("prices", {})
             raw_price = prices_info.get("price")
             
-            formatted_price = "POR ENCARGUE"
-            
-            if not is_on_demand and raw_price and str(raw_price).isdigit() and int(raw_price) > 0:
-                val_final = int(raw_price) / 100
-                if val_final > 0:
+            if is_on_demand:
+                formatted_price = "POR ENCARGUE"
+            else:
+                if raw_price and str(raw_price).isdigit() and int(raw_price) > 0:
+                    val_final = int(raw_price) / 100
                     formatted_price = f"${val_final:,.0f}".replace(",", ".")
                 else:
                     is_on_demand = True
-            else:
-                is_on_demand = True
+                    formatted_price = "POR ENCARGUE"
 
             valid_products.append({
                 "id": product.get("id"),
@@ -151,7 +147,7 @@ def draw_vertical_gradient(draw_obj, rect, color_top, color_bottom):
         ratio = i / float(height)
         r = int(color_top[0] * (1 - ratio) + color_bottom[0] * ratio)
         g = int(color_top[1] * (1 - ratio) + color_bottom[1] * ratio)
-        b = int(color_top[2] * (1 - ratio) + color_bottom[3] * ratio)
+        b = int(color_top[2] * (1 - ratio) + color_bottom[2] * ratio)
         a = int(color_top[3] * (1 - ratio) + color_bottom[3] * ratio)
         draw_obj.line([(x1, y1 + i), (x2, y1 + i)], fill=(r, g, b, a))
 
