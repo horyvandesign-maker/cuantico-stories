@@ -17,14 +17,17 @@ SITE_URL = "https://cuanticopc.com.ar"
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
 def get_font(size):
-    """Descarga e instala una fuente legible en alta resolución."""
-    font_path = "Roboto-Bold.ttf"
-    if not os.path.exists(font_path):
-        url = "https://github.com/google/fonts/raw/main/ofl/roboto/static/Roboto-Bold.ttf"
-        res = requests.get(url)
-        with open(font_path, "wb") as f:
-            f.write(res.content)
-    return ImageFont.truetype(font_path, size)
+    """Obtiene una tipografía escalable garantizada."""
+    try:
+        # Intenta usar DejaVuSans que viene preinstalada en Linux/Ubuntu Runners
+        return ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", size)
+    except Exception:
+        try:
+            # Fallback a otra fuente del sistema si la primera no está
+            return ImageFont.truetype("/usr/share/fonts/truetype/freefont/FreeSansBold.ttf", size)
+        except Exception:
+            # Si falla todo, usa la fuente predeterminada
+            return ImageFont.load_default()
 
 def clean_text(text):
     """Limpia caracteres especiales e inconsistencias de HTML."""
