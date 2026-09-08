@@ -1,6 +1,7 @@
 import os
 import random
 import time
+import html
 import requests
 from io import BytesIO
 from PIL import Image, ImageFilter, ImageDraw, ImageFont
@@ -15,8 +16,22 @@ ACCESS_TOKEN = os.environ.get("INSTAGRAM_ACCESS_TOKEN")
 SITE_URL = "https://cuanticopc.com.ar"
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
+def get_font(size):
+    """Descarga e instala una fuente legible en alta resolución."""
+    font_path = "Roboto-Bold.ttf"
+    if not os.path.exists(font_path):
+        url = "https://github.com/google/fonts/raw/main/ofl/roboto/static/Roboto-Bold.ttf"
+        res = requests.get(url)
+        with open(font_path, "wb") as f:
+            f.write(res.content)
+    return ImageFont.truetype(font_path, size)
+
+def clean_text(text):
+    """Limpia caracteres especiales e inconsistencias de HTML."""
+    decoded = html.unescape(text)
+    return decoded.replace('"', "'").replace("”", "'").strip()
+
 def get_product_and_image():
-    """Busca un producto y asegura descargar una imagen decodificable."""
     endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     
@@ -42,8 +57,10 @@ def get_product_and_image():
                 price_raw = product.get("prices", {}).get("price", "0")
                 price = f"${int(price_raw) / 100:,.0f}".replace(",", ".") if str(price_raw).isdigit() else "$ Consultar"
                 
+                raw_name = product.get("name", "Producto Cuantico")
+                
                 return {
-                    "name": product.get("name", "Producto Cuantico"),
+                    "name": clean_text(raw_name),
                     "price": price,
                     "img_obj": img_orig,
                     "raw_url": img_url
@@ -55,34 +72,52 @@ def get_product_and_image():
     exit(1)
 
 def create_story_template(product):
-    """Genera el lienzo vertical de 1080x1920 px."""
+    """Genera el lienzo vertical de 1080x1920 px con textos grandes."""
     canvas_w, canvas_h = 1080, 1920
     img_orig = product["img_obj"]
     
+    # 1. Fondo Oscuro
     bg = img_orig.resize((canvas_w, canvas_h))
-    bg = bg.filter(ImageFilter.GaussianBlur(30))
+    bg = bg.filter(ImageFilter.GaussianBlur(40))
     
-    overlay = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 160))
+    overlay = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 180))
     bg.paste(overlay, (0, 0), overlay)
     
-    img_orig.thumbnail((850, 850))
+    # 2. Rescalar Imagen
+    img_orig.thumbnail((880, 880))
     p_w, p_h = img_orig.size
     offset_x = (canvas_w - p_w) // 2
-    offset_y = (canvas_h - p_h) // 2 - 100
+    offset_y = (canvas_h - p_h) // 2 - 120
     bg.paste(img_orig, (offset_x, offset_y))
     
+    # 3. Dibujar Fuentes Gigantes
     draw = ImageDraw.Draw(bg)
-    draw.text((canvas_w // 2, 180), "CUANTICO PC", fill="white", anchor="mm")
-    draw.text((canvas_w // 2, offset_y + p_h + 80), product["name"][:35], fill="white", anchor="mm")
-    draw.text((canvas_w // 2, offset_y + p_h + 160), product["price"], fill="#00FF88", anchor="mm")
-    draw.text((canvas_w // 2, canvas_h - 150), "Conseguilo en cuanticopc.com.ar", fill="white", anchor="mm")
+    
+    font_brand = get_font(55)
+    font_title = get_font(48)
+    font_price = get_font(75)
+    font_footer = get_font(40)
+    
+    # Encabezado Marca
+    draw.text((canvas_w // 2, 160), "CUANTICO PC", fill="#FFFFFF", font=font_brand, anchor="mm")
+    
+    # Nombre Producto
+    title_text = product["name"]
+    if len(title_text) > 40:
+        title_text = title_text[:37] + "..."
+    draw.text((canvas_w // 2, offset_y + p_h + 90), title_text, fill="#F0F0F0", font=font_title, anchor="mm")
+    
+    # Precio Destacado
+    draw.text((canvas_w // 2, offset_y + p_h + 200), product["price"], fill="#00FF88", font=font_price, anchor="mm")
+    
+    # Pie de página / Web
+    draw.text((canvas_w // 2, canvas_h - 180), "cuanticopc.com.ar", fill="#CCCCCC", font=font_footer, anchor="mm")
     
     output_path = "story_preview.jpg"
     bg.save(output_path, "JPEG", quality=95)
     return output_path
 
 def publish_to_instagram(image_url):
-    """Publica la imagen procesada en Instagram Stories via Meta Graph API."""
     container_url = f"https://graph.facebook.com/v26.0/{IG_USER_ID}/media"
     payload = {
         "image_url": image_url,
@@ -129,14 +164,12 @@ def process_workflow():
         
     print("Esperando la respuesta en Telegram por 120 segundos...")
     
-    # Manejo de la acción según el botón presionado
     @bot.callback_query_handler(func=lambda call: True)
     def callback_listener(call):
         if call.data == "approve":
             bot.answer_callback_query(call.id, "Publicando en Instagram...")
-            bot.edit_message_caption("🚀 *Publicando en Instagram Stories...*", chat_id=TELEGRAM_CHAT_ID, message_id=msg.message_id, parse_mode="Markdown")
+            bot.edit_message_caption(chat_id=TELEGRAM_CHAT_ID, message_id=msg.message_id, caption="🚀 *Publicando en Instagram Stories...*", parse_mode="Markdown")
             
-            # Nota: Meta requiere una URL pública de la imagen. Usamos la del producto original como fallback o la enviada
             success, result = publish_to_instagram(product["raw_url"])
             if success:
                 bot.send_message(TELEGRAM_CHAT_ID, f"🎉 ¡Publicado exitosamente en Instagram! ID: `{result}`", parse_mode="Markdown")
