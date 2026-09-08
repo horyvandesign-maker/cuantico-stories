@@ -2,6 +2,7 @@ import os
 import random
 import time
 import html
+import textwrap
 import requests
 from io import BytesIO
 from PIL import Image, ImageFilter, ImageDraw, ImageFont
@@ -17,16 +18,13 @@ SITE_URL = "https://cuanticopc.com.ar"
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
 def get_font(size):
-    """Obtiene una tipografía escalable garantizada."""
+    """Obtiene una tipografía escalable garantizada del sistema Linux."""
     try:
-        # Intenta usar DejaVuSans que viene preinstalada en Linux/Ubuntu Runners
         return ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", size)
     except Exception:
         try:
-            # Fallback a otra fuente del sistema si la primera no está
             return ImageFont.truetype("/usr/share/fonts/truetype/freefont/FreeSansBold.ttf", size)
         except Exception:
-            # Si falla todo, usa la fuente predeterminada
             return ImageFont.load_default()
 
 def clean_text(text):
@@ -35,6 +33,7 @@ def clean_text(text):
     return decoded.replace('"', "'").replace("”", "'").strip()
 
 def get_product_and_image():
+    """Obtiene un producto activo desde WooCommerce."""
     endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     
@@ -57,14 +56,22 @@ def get_product_and_image():
             if img_res.status_code == 200:
                 img_orig = Image.open(BytesIO(img_res.content)).convert("RGB")
                 
+                # Gestión de Precios y Productos "Por Encargo"
                 price_raw = product.get("prices", {}).get("price", "0")
-                price = f"${int(price_raw) / 100:,.0f}".replace(",", ".") if str(price_raw).isdigit() else "$ Consultar"
+                is_on_demand = False
+                
+                if not str(price_raw).isdigit() or int(price_raw) == 0:
+                    is_on_demand = True
+                    price = "¡DISPONIBLE POR ENCARGO!"
+                else:
+                    price = f"${int(price_raw) / 100:,.0f}".replace(",", ".")
                 
                 raw_name = product.get("name", "Producto Cuantico")
                 
                 return {
                     "name": clean_text(raw_name),
                     "price": price,
+                    "is_on_demand": is_on_demand,
                     "img_obj": img_orig,
                     "raw_url": img_url
                 }
@@ -75,7 +82,7 @@ def get_product_and_image():
     exit(1)
 
 def create_story_template(product):
-    """Genera el lienzo vertical de 1080x1920 px con textos grandes."""
+    """Genera el lienzo vertical de 1080x1920 px con textos formateados."""
     canvas_w, canvas_h = 1080, 1920
     img_orig = product["img_obj"]
     
@@ -86,32 +93,40 @@ def create_story_template(product):
     overlay = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 180))
     bg.paste(overlay, (0, 0), overlay)
     
-    # 2. Rescalar Imagen
-    img_orig.thumbnail((880, 880))
+    # 2. Rescalar e Insertar Imagen
+    img_orig.thumbnail((800, 800))
     p_w, p_h = img_orig.size
     offset_x = (canvas_w - p_w) // 2
     offset_y = (canvas_h - p_h) // 2 - 120
     bg.paste(img_orig, (offset_x, offset_y))
     
-    # 3. Dibujar Fuentes Gigantes
+    # 3. Dibujar Elementos de Marca y Texto
     draw = ImageDraw.Draw(bg)
     
-    font_brand = get_font(55)
-    font_title = get_font(48)
-    font_price = get_font(75)
-    font_footer = get_font(40)
+    font_brand = get_font(50)
+    font_title = get_font(42)
+    font_price = get_font(65) if not product["is_on_demand"] else get_font(45)
+    font_footer = get_font(38)
     
     # Encabezado Marca
     draw.text((canvas_w // 2, 160), "CUANTICO PC", fill="#FFFFFF", font=font_brand, anchor="mm")
     
-    # Nombre Producto
-    title_text = product["name"]
-    if len(title_text) > 40:
-        title_text = title_text[:37] + "..."
-    draw.text((canvas_w // 2, offset_y + p_h + 90), title_text, fill="#F0F0F0", font=font_title, anchor="mm")
+    # Nombre del producto multilínea (evita recortes)
+    raw_title = product["name"]
+    wrapped_lines = textwrap.wrap(raw_title, width=26)
+    wrapped_text = "\n".join(wrapped_lines[:3]) # Hasta 3 líneas centradas
     
-    # Precio Destacado
-    draw.text((canvas_w // 2, offset_y + p_h + 200), product["price"], fill="#00FF88", font=font_price, anchor="mm")
+    draw.multiline_text(
+        (canvas_w // 2, offset_y + p_h + 100), 
+        wrapped_text, 
+        fill="#F0F0F0", 
+        font=font_title, 
+        anchor="mm", 
+        align="center"
+    )
+    
+    # Precio o Estado "Por Encargo"
+    draw.text((canvas_w // 2, offset_y + p_h + 230), product["price"], fill="#00FF88", font=font_price, anchor="mm")
     
     # Pie de página / Web
     draw.text((canvas_w // 2, canvas_h - 180), "cuanticopc.com.ar", fill="#CCCCCC", font=font_footer, anchor="mm")
@@ -121,6 +136,7 @@ def create_story_template(product):
     return output_path
 
 def publish_to_instagram(image_url):
+    """Publica en Instagram API."""
     container_url = f"https://graph.facebook.com/v26.0/{IG_USER_ID}/media"
     payload = {
         "image_url": image_url,
