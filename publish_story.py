@@ -20,7 +20,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 SITE_URL = "https://cuanticopc.com.ar"
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
-# Paleta de colores neón
+# Paleta de colores neón y etiquetas dinámicas
 ACCENT_COLORS = ["#00FF88", "#00E5FF", "#B000FF", "#FF007F"]
 HEADER_TAGS = ["NUEVO INGRESO", "OFERTA DESTACADA", "STOCK DISPONIBLE", "EQUIPO GAMER"]
 
@@ -102,6 +102,7 @@ def fetch_all_valid_products():
             prices_info = product.get("prices", {})
             raw_price = prices_info.get("price")
             
+            # Filtrar si no hay precio cargado
             if raw_price is None or str(raw_price).strip() in ["", "0", "null"]:
                 continue
                 
@@ -145,9 +146,11 @@ def draw_cyber_grid(draw_obj, rect):
     x1, y1, x2, y2 = rect
     grid_color = (138, 43, 226, random.randint(40, 80))
     
+    # Líneas horizontales con perspectiva
     for i in range(0, 200, random.choice([20, 25, 30])):
         draw_obj.line([(x1, y1 + i), (x2, y1 + i)], fill=grid_color, width=1)
         
+    # Líneas perspectiva diagonales
     center_x = (x1 + x2) // 2
     step = random.choice([70, 80, 90])
     for offset in range(-600, 700, step):
@@ -155,6 +158,7 @@ def draw_cyber_grid(draw_obj, rect):
 
 def draw_geometric_polygons(draw_obj, side="right", accent_hex="#00E5FF"):
     """Dibuja mallas poligonales 3D vectoriales dinámicas en los bordes."""
+    # Convertir Hex a RGB
     h = accent_hex.lstrip('#')
     rgb = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
     line_color = (rgb[0], rgb[1], rgb[2], 120)
@@ -162,6 +166,7 @@ def draw_geometric_polygons(draw_obj, side="right", accent_hex="#00E5FF"):
     base_x = 900 if side == "right" else 180
     dir_x = 1 if side == "right" else -1
     
+    # Variación aleatoria suave de vértices
     v = random.randint(-15, 15)
     nodes = [
         (base_x, 600 + v), (base_x + dir_x*120, 520 + v), (base_x + dir_x*150, 680 + v),
@@ -169,48 +174,47 @@ def draw_geometric_polygons(draw_obj, side="right", accent_hex="#00E5FF"):
         (base_x + dir_x*110, 850 + v), (base_x + dir_x*160, 980 + v), (base_x + dir_x*20, 1050 + v)
     ]
     
-    triangles = [(0,1,2), (0,2,3), (0,3,4), (2,3,5), (2,5,6), (3,5,7)]
+    triangles = [
+        (0,1,2), (0,2,3), (0,3,4), (2,3,5), (2,5,6), (3,5,7)
+    ]
+    
     for t in triangles:
         p1, p2, p3 = nodes[t[0]], nodes[t[1]], nodes[t[2]]
         draw_obj.polygon([p1, p2, p3], outline=line_color, width=2)
 
-def draw_circuit_lines(draw_obj):
-    """Dibuja circuitos ciberestéticos vectoriales en las esquinas."""
-    color = (0, 229, 255, 140)
-    # Esquina superior derecha
-    draw_obj.line([(850, 0), (850, 150), (950, 250), (950, 320)], fill=color, width=3)
-    draw_obj.ellipse([942, 312, 958, 328], fill=color)
-    # Esquina inferior izquierda
-    draw_obj.line([(120, 1500), (120, 1700), (220, 1800), (220, 1920)], fill=color, width=3)
-    draw_obj.ellipse([112, 1492, 128, 1508], fill=color)
-
 def create_story_template(product, img_obj):
-    """Genera la plantilla con estructura de producto."""
+    """Genera la plantilla con estructura fija pero elementos vectoriales infinitos y dinámicos."""
     canvas_w, canvas_h = 1080, 1920
     accent_color = random.choice(ACCENT_COLORS)
     header_text = random.choice(HEADER_TAGS)
     
+    # 1. Fondo base degradado Púrpura/Azul Oscuro Cyberpunk
     bg = Image.new("RGBA", (canvas_w, canvas_h), (10, 8, 20, 255))
     g_layer = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     g_draw = ImageDraw.Draw(g_layer)
     draw_vertical_gradient(g_draw, (0, 0, canvas_w, canvas_h), (18, 12, 38, 255), (6, 5, 15, 255))
     bg.paste(g_layer, (0, 0), g_layer)
     
+    # 2. Renderizar polígonos y mallas synthwave vectoriales
     cyber_draw = ImageDraw.Draw(bg)
     draw_cyber_grid(cyber_draw, (0, canvas_h - 250, canvas_w, canvas_h))
     
+    # Decidir de qué lado renderizar los polígonos
     polygon_side = random.choice(["right", "left", "both"])
     if polygon_side in ["right", "both"]:
         draw_geometric_polygons(cyber_draw, side="right", accent_hex=accent_color)
     if polygon_side in ["left", "both"]:
         draw_geometric_polygons(cyber_draw, side="left", accent_hex=accent_color)
     
+    # 3. Marqueza superior dinámica
     font_header = get_font(34)
     cyber_draw.text((70, 65), header_text, fill="#FFFFFF", font=font_header)
     
+    # Franjas decorativas neón superiores
     cyber_draw.polygon([(950, 55), (980, 55), (940, 105), (910, 105)], fill="#B000FF")
     cyber_draw.polygon([(1000, 55), (1030, 55), (990, 105), (960, 105)], fill=accent_color)
     
+    # 4. Tarjeta contenedor limpia para la foto del producto
     card_w, card_h = 860, 860
     card_x = (canvas_w - card_w) // 2
     card_y = 400
@@ -231,7 +235,9 @@ def create_story_template(product, img_obj):
     
     draw = ImageDraw.Draw(bg)
     
+    # 5. Render del Logo Agrandado y Posición Aleatoria
     logo_path = os.path.join(os.path.dirname(__file__), "logo_canva.png")
+    
     if os.path.exists(logo_path):
         try:
             logo_img = Image.open(logo_path).convert("RGBA")
@@ -250,18 +256,27 @@ def create_story_template(product, img_obj):
                 
             logo_y = 135
             bg.paste(logo_img, (logo_x, logo_y), logo_img)
-        except Exception:
+        except Exception as e:
             draw.text((canvas_w // 2, 165), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
     else:
         draw.text((canvas_w // 2, 165), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
     
+    # 6. Título del producto
     font_title = get_font(42)
     wrapped_lines = textwrap.wrap(product["ai_name"], width=22)
     wrapped_text = "\n".join(wrapped_lines[:3])
     
     title_y = card_y + card_h + 90
-    draw.multiline_text((canvas_w // 2, title_y), wrapped_text, fill="#FFFFFF", font=font_title, anchor="mm", align="center")
+    draw.multiline_text(
+        (canvas_w // 2, title_y), 
+        wrapped_text, 
+        fill="#FFFFFF", 
+        font=font_title, 
+        anchor="mm", 
+        align="center"
+    )
     
+    # 7. Cápsula de precio Neón con borde dinámico
     font_price = get_font(58)
     price_str = product["price"]
     
@@ -269,7 +284,8 @@ def create_story_template(product, img_obj):
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
     
-    badge_padding_x, badge_padding_y = 55, 25
+    badge_padding_x = 55
+    badge_padding_y = 25
     badge_w = text_w + (badge_padding_x * 2)
     badge_h = text_h + (badge_padding_y * 2)
     
@@ -281,76 +297,13 @@ def create_story_template(product, img_obj):
     draw.rounded_rectangle((badge_x1, badge_y1, badge_x2, badge_y2), radius=25, fill=(18, 22, 28, 240), outline=accent_color, width=3)
     draw.text(((badge_x1 + badge_x2) // 2, (badge_y1 + badge_y2) // 2 - 3), price_str, fill=accent_color, font=font_price, anchor="mm")
     
+    # 8. Pie de página comercial Gamer
     font_footer_sub = get_font(26)
     font_footer_main = get_font(32)
     draw.text((70, canvas_h - 100), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", fill="#AAAAAA", font=font_footer_sub)
     draw.text((70, canvas_h - 60), "@CUANTICOPC", fill="#FFFFFF", font=font_footer_main)
     
     output_path = f"story_{product['id']}.jpg"
-    bg.save(output_path, "JPEG", quality=95)
-    return output_path
-
-def create_generic_promo_story(promo_id=1):
-    """Genera placas promocionales institucionales intercaladas."""
-    canvas_w, canvas_h = 1080, 1920
-    bg = Image.new("RGBA", (canvas_w, canvas_h), (8, 6, 20, 255))
-    
-    g_layer = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
-    g_draw = ImageDraw.Draw(g_layer)
-    draw_vertical_gradient(g_draw, (0, 0, canvas_w, canvas_h), (12, 10, 30, 255), (4, 3, 10, 255))
-    bg.paste(g_layer, (0, 0), g_layer)
-    
-    draw = ImageDraw.Draw(bg)
-    
-    # 1. Logo superior
-    logo_path = os.path.join(os.path.dirname(__file__), "logo_canva.png")
-    if os.path.exists(logo_path):
-        try:
-            logo_img = Image.open(logo_path).convert("RGBA")
-            logo_img.thumbnail((500, 200))
-            bg.paste(logo_img, ((canvas_w - logo_img.width) // 2, 140), logo_img)
-        except Exception:
-            pass
-            
-    # 2. Dibujar Circuitos Vectoriales estilo Branding
-    draw_circuit_lines(draw)
-    draw_geometric_polygons(draw, side="right", accent_hex="#00E5FF")
-
-    # 3. Textos Institucionales
-    draw.text((canvas_w // 2, 480), "TU TECNOLOGÍA", fill="#FFFFFF", font=get_font(60), anchor="mm")
-    draw.text((canvas_w // 2, 560), "NUESTRA EXPERIENCIA", fill="#00E5FF", font=get_font(52), anchor="mm")
-
-    # 4. Bloque de servicios/categorías
-    services_y = 700
-    services = [
-        "💻  Notebooks",
-        "🖥️  PCs Gamer y Oficina",
-        "🌐  Redes y Conectividad",
-        "🎧  Accesorios & Periféricos"
-    ]
-    for s in services:
-        draw.text((120, services_y), s, fill="#DDDDDD", font=get_font(38))
-        services_y += 75
-
-    # 5. Bloque de beneficios comerciales
-    benefits_y = 1150
-    draw.text((120, benefits_y - 80), "VENTA ONLINE Y PRESENCIAL", fill="#00FF88", font=get_font(36))
-    
-    benefits = [
-        "🛒  MercadoLibre",
-        "🚚  Envíos a todo el país",
-        "💵  Descuentos en efectivo / transferencia",
-        "💳  Hasta 12 Cuotas con Tarjetas"
-    ]
-    for b in benefits:
-        draw.text((120, benefits_y), b, fill="#FFFFFF", font=get_font(34))
-        benefits_y += 70
-
-    # 6. Pie de página comercial
-    draw.text((canvas_w // 2, canvas_h - 160), "ESCRIBINOS Y TE ASESORAMOS SIN COMPROMISO", fill="#00E5FF", font=get_font(30), anchor="mm")
-    draw.text((canvas_w // 2, canvas_h - 90), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS | @CUANTICOPC", fill="#AAAAAA", font=get_font(24), anchor="mm")
-
-    output_path = f"promo_story_{promo_id}_{int(time.time())}.jpg"
     bg.save(output_path, "JPEG", quality=95)
     return output_path
 
@@ -386,7 +339,7 @@ def publish_to_instagram(image_url):
     return False, pub_data
 
 def process_catalog():
-    """Recorre el catálogo intercalando placas institucionales cada N productos."""
+    """Recorre la lista de productos pidiendo aprobación interactiva en Telegram."""
     products = fetch_all_valid_products()
     if not products:
         bot.send_message(TELEGRAM_CHAT_ID, "❌ No se encontraron productos válidos para publicar.")
@@ -397,52 +350,7 @@ def process_catalog():
     
     bot.send_message(TELEGRAM_CHAT_ID, f"🚀 *Iniciando revisión de catálogo completo* ({total} productos encontrados).", parse_mode="Markdown")
 
-    # Frecuencia de intercalado (Ej: cada 4 productos se propone 1 placa genérica)
-    PROMO_EVERY_N_PRODUCTS = 4
-
     for index, prod in enumerate(products, start=1):
-        # --- INTERCALAR PLACA GENÉRICA / PROMOCIONAL ---
-        if index > 1 and (index - 1) % PROMO_EVERY_N_PRODUCTS == 0:
-            try:
-                promo_path = create_generic_promo_story(promo_id=index)
-                markup_p = InlineKeyboardMarkup()
-                markup_p.row(
-                    InlineKeyboardButton("✅ Aprobar Promo", callback_data="approve_promo"),
-                    InlineKeyboardButton("⏭️ Saltear Promo", callback_data="skip_promo")
-                )
-                
-                caption_p = "📢 *[Placa Institucional / Promocional]*\n¿Publicar esta Story institucional para dar variedad al feed?"
-                
-                with open(promo_path, "rb") as photo:
-                    msg_p = bot.send_photo(TELEGRAM_CHAT_ID, photo, caption=caption_p, reply_markup=markup_p, parse_mode="Markdown")
-                    
-                promo_choice = {"action": None}
-                
-                @bot.callback_query_handler(func=lambda call: call.data in ["approve_promo", "skip_promo"])
-                def promo_listener(call):
-                    if call.data == "approve_promo":
-                        promo_choice["action"] = "approve"
-                        bot.answer_callback_query(call.id, "Publicando promo...")
-                        bot.edit_message_caption(chat_id=TELEGRAM_CHAT_ID, message_id=msg_p.message_id, caption="🚀 *Publicando Placa Institucional...*", parse_mode="Markdown")
-                    else:
-                        promo_choice["action"] = "skip"
-                        bot.answer_callback_query(call.id, "Promo salteada.")
-                        bot.edit_message_caption(chat_id=TELEGRAM_CHAT_ID, message_id=msg_p.message_id, caption="⏭️ *Promo salteada.*", parse_mode="Markdown")
-                    bot.stop_polling()
-
-                bot.polling(timeout=300, non_stop=False)
-                
-                if promo_choice["action"] == "approve":
-                    # Nota: Para la API de Instagram Meta Graph se requiere URL accesible. Si usás URL directa pasás la imagen original o tu servidor web.
-                    bot.send_message(TELEGRAM_CHAT_ID, "⚠️ *Tip:* Recuerda que Meta API requiere que la imagen esté alojada en una URL pública.", parse_mode="Markdown")
-                
-                if os.path.exists(promo_path):
-                    os.remove(promo_path)
-                    
-            except Exception as e:
-                print(f"Error procesando placa genérica: {e}")
-
-        # --- PROCESAR PRODUCTO DEL CATÁLOGO ---
         try:
             img_res = requests.get(prod["raw_url"], headers=headers, timeout=10)
             if img_res.status_code != 200:
