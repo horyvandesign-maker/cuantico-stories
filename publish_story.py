@@ -10,7 +10,7 @@ import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from google import genai
 
-# Carga de credenciales y configuración
+# Carga de credenciales
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 IG_USER_ID = os.environ.get("IG_USER_ID")
@@ -76,7 +76,11 @@ def generate_ai_title(original_title):
         return original_title
 
 def fetch_all_valid_products():
-    """Forzado estricto: Si el producto está en reserva ('Se puede reservar') o sin stock, NUNCA muestra precio y siempre sale como POR ENCARGUE."""
+    """
+    Filtro estricto: Detecta si el producto está en reserva ('Se puede reservar'), 
+    si no tiene stock o si está pausado en WooSync. 
+    EN ESOS CASOS ANULA CUALQUIER PRECIO QUE DEVUELVA LA BASE DE DATOS.
+    """
     endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
@@ -107,19 +111,18 @@ def fetch_all_valid_products():
             is_in_stock = product.get("is_in_stock", True)
             backorders_allowed = product.get("backorders_allowed", False)
             
-            # Criterio absoluto para marcar POR ENCARGUE:
-            # Si no hay stock real o permite reservas ("Se puede reservar")
+            # REGLA DE ORO: Si stock es 0, 'Se puede reservar', sin stock o no publicado -> POR ENCARGUE OBLIGATORIO
             is_on_demand = False
             
             if not is_in_stock or stock_status in ["outofstock", "onbackorder"] or backorders_allowed or status != "publish":
                 is_on_demand = True
-                
-            prices_info = product.get("prices", {})
-            raw_price = prices_info.get("price")
             
+            # Si el producto se identifica como "por encargue", IGNORAMOS cualquier precio retornado por la base de datos
             if is_on_demand:
                 formatted_price = "POR ENCARGUE"
             else:
+                prices_info = product.get("prices", {})
+                raw_price = prices_info.get("price")
                 if raw_price and str(raw_price).isdigit() and int(raw_price) > 0:
                     val_final = int(raw_price) / 100
                     formatted_price = f"${val_final:,.0f}".replace(",", ".")
