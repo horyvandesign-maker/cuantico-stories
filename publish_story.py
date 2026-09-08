@@ -57,7 +57,7 @@ def generate_ai_title(original_title):
         return original_title
 
 def fetch_all_valid_products():
-    """Obtiene todos los productos con precio válido e imagen desde WooCommerce."""
+    """Obtiene todos los productos con precio válido desde WooCommerce."""
     endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     
@@ -81,12 +81,10 @@ def fetch_all_valid_products():
             prices_info = product.get("prices", {})
             raw_price = prices_info.get("price", "0")
             
-            # Filtrar estrictamente productos que tengan un precio numérico válido > 0
             if not str(raw_price).isdigit() or int(raw_price) <= 0:
                 continue
                 
             val_num = int(raw_price)
-            # Formatear precio dividiendo los centavos
             val_final = val_num / 100
             formatted_price = f"${val_final:,.0f}".replace(",", ".")
             
@@ -102,45 +100,112 @@ def fetch_all_valid_products():
     print(f"Se encontraron {len(valid_products)} productos con precio válido.")
     return valid_products
 
+def draw_vertical_gradient(draw_obj, rect, color_top, color_bottom):
+    """Dibuja un degradado vertical suave."""
+    x1, y1, x2, y2 = rect
+    height = y2 - y1
+    for i in range(height):
+        ratio = i / float(height)
+        r = int(color_top[0] * (1 - ratio) + color_bottom[0] * ratio)
+        g = int(color_top[1] * (1 - ratio) + color_bottom[1] * ratio)
+        b = int(color_top[2] * (1 - ratio) + color_bottom[2] * ratio)
+        a = int(color_top[3] * (1 - ratio) + color_bottom[3] * ratio)
+        draw_obj.line([(x1, y1 + i), (x2, y1 + i)], fill=(r, g, b, a))
+
 def create_story_template(product, img_obj):
-    """Genera la plantilla visual de 1080x1920 px."""
+    """Genera la plantilla profesional enriquecida con tarjeta, badge, gradientes y logo."""
     canvas_w, canvas_h = 1080, 1920
     
-    bg = img_obj.resize((canvas_w, canvas_h))
-    bg = bg.filter(ImageFilter.GaussianBlur(40))
+    # 1. Fondo difuminado de alta calidad
+    bg = img_obj.resize((canvas_w, canvas_h)).filter(ImageFilter.GaussianBlur(50))
     
-    overlay = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 180))
+    # Overlay base oscuro
+    overlay = Image.new("RGBA", (canvas_w, canvas_h), (12, 12, 18, 160))
     bg.paste(overlay, (0, 0), overlay)
     
-    img_obj.thumbnail((800, 800))
-    p_w, p_h = img_obj.size
-    offset_x = (canvas_w - p_w) // 2
-    offset_y = (canvas_h - p_h) // 2 - 120
-    bg.paste(img_obj, (offset_x, offset_y))
+    # 2. Gradientes de sombra superior e inferior (Punto 4)
+    gradient_layer = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+    g_draw = ImageDraw.Draw(gradient_layer)
+    draw_vertical_gradient(g_draw, (0, 0, canvas_w, 350), (0, 0, 0, 210), (0, 0, 0, 0))
+    draw_vertical_gradient(g_draw, (0, canvas_h - 350, canvas_w, canvas_h), (0, 0, 0, 0), (0, 0, 0, 230))
+    bg.paste(gradient_layer, (0, 0), gradient_layer)
+    
+    # 3. Tarjeta contenedora con esquinas redondeadas para el producto (Punto 1)
+    card_w, card_h = 860, 860
+    card_x = (canvas_w - card_w) // 2
+    card_y = 420
+    
+    card_bg = Image.new("RGBA", (card_w, card_h), (255, 255, 255, 240))
+    card_mask = Image.new("L", (card_w, card_h), 0)
+    card_mask_draw = ImageDraw.Draw(card_mask)
+    card_mask_draw.rounded_rectangle((0, 0, card_w, card_h), radius=35, fill=255)
+    
+    bg.paste(card_bg, (card_x, card_y), card_mask)
+    
+    # Insertar imagen del producto centrada dentro de la tarjeta
+    img_copy = img_obj.copy()
+    img_copy.thumbnail((760, 760))
+    p_w, p_h = img_copy.size
+    p_x = card_x + (card_w - p_w) // 2
+    p_y = card_y + (card_h - p_h) // 2
+    bg.paste(img_copy, (p_x, p_y), img_copy if img_copy.mode == "RGBA" else None)
     
     draw = ImageDraw.Draw(bg)
     
-    font_brand = get_font(50)
-    font_title = get_font(44)
-    font_price = get_font(65)
-    font_footer = get_font(38)
+    # 4. Logo en la parte superior (Punto 4)
+    logo_path = "logo.png"
+    if os.path.exists(logo_path):
+        try:
+            logo_img = Image.open(logo_path).convert("RGBA")
+            logo_img.thumbnail((450, 130))
+            l_w, l_h = logo_img.size
+            bg.paste(logo_img, ((canvas_w - l_w) // 2, 140), logo_img)
+        except Exception:
+            draw.text((canvas_w // 2, 160), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
+    else:
+        draw.text((canvas_w // 2, 160), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
     
-    draw.text((canvas_w // 2, 160), "CUANTICO PC", fill="#FFFFFF", font=font_brand, anchor="mm")
-    
-    wrapped_lines = textwrap.wrap(product["ai_name"], width=24)
+    # 5. Título del producto mejor estructurado (Punto 3)
+    font_title = get_font(42)
+    wrapped_lines = textwrap.wrap(product["ai_name"], width=22)
     wrapped_text = "\n".join(wrapped_lines[:3])
     
+    title_y = card_y + card_h + 90
     draw.multiline_text(
-        (canvas_w // 2, offset_y + p_h + 100), 
+        (canvas_w // 2, title_y), 
         wrapped_text, 
-        fill="#F0F0F0", 
+        fill="#FFFFFF", 
         font=font_title, 
         anchor="mm", 
         align="center"
     )
     
-    draw.text((canvas_w // 2, offset_y + p_h + 230), product["price"], fill="#00FF88", font=font_price, anchor="mm")
-    draw.text((canvas_w // 2, canvas_h - 180), "cuanticopc.com.ar", fill="#CCCCCC", font=font_footer, anchor="mm")
+    # 6. Badge / Botón destacado para el Precio (Punto 2)
+    font_price = get_font(58)
+    price_str = product["price"]
+    
+    # Calcular ancho del texto para ajustar el tamaño del botón
+    bbox = draw.textbbox((0, 0), price_str, font=font_price)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    
+    badge_padding_x = 55
+    badge_padding_y = 25
+    badge_w = text_w + (badge_padding_x * 2)
+    badge_h = text_h + (badge_padding_y * 2)
+    
+    badge_x1 = (canvas_w - badge_w) // 2
+    badge_y1 = title_y + 110
+    badge_x2 = badge_x1 + badge_w
+    badge_y2 = badge_y1 + badge_h
+    
+    # Dibujar cápsula con fondo oscuro estilizado
+    draw.rounded_rectangle((badge_x1, badge_y1, badge_x2, badge_y2), radius=25, fill=(18, 22, 28, 240), outline="#00FF88", width=3)
+    draw.text(((badge_x1 + badge_x2) // 2, (badge_y1 + badge_y2) // 2 - 3), price_str, fill="#00FF88", font=font_price, anchor="mm")
+    
+    # 7. Marca de agua inferior
+    font_footer = get_font(38)
+    draw.text((canvas_w // 2, canvas_h - 140), "cuanticopc.com.ar", fill="#DDDDDD", font=font_footer, anchor="mm")
     
     output_path = f"story_{product['id']}.jpg"
     bg.save(output_path, "JPEG", quality=95)
@@ -191,17 +256,13 @@ def process_catalog():
 
     for index, prod in enumerate(products, start=1):
         try:
-            # Descargar la imagen del producto
             img_res = requests.get(prod["raw_url"], headers=headers, timeout=10)
             if img_res.status_code != 200:
                 continue
                 
             img_obj = Image.open(BytesIO(img_res.content)).convert("RGB")
             
-            # Generar título por IA
             prod["ai_name"] = generate_ai_title(prod["original_name"])
-            
-            # Generar la imagen preview
             image_path = create_story_template(prod, img_obj)
             
             markup = InlineKeyboardMarkup()
@@ -222,7 +283,6 @@ def process_catalog():
                 
             user_choice = {"action": None}
             
-            # Capturar la respuesta del botón en Telegram
             @bot.callback_query_handler(func=lambda call: True)
             def callback_listener(call):
                 if call.data.startswith("approve_"):
@@ -240,10 +300,8 @@ def process_catalog():
                 
                 bot.stop_polling()
 
-            # Esperar interacción del usuario (hasta 5 minutos por producto)
             bot.polling(timeout=300, non_stop=False)
             
-            # Limpiar archivo temporal
             if os.path.exists(image_path):
                 os.remove(image_path)
                 
@@ -253,7 +311,7 @@ def process_catalog():
                     bot.send_message(TELEGRAM_CHAT_ID, f"🎉 ¡Publicado exitosamente en Instagram!", parse_mode="Markdown")
                 else:
                     bot.send_message(TELEGRAM_CHAT_ID, f"❌ Error al publicar en Meta: `{result}`", parse_mode="Markdown")
-                time.sleep(3) # Pausa entre publicaciones
+                time.sleep(3)
                 
             elif user_choice["action"] == "stop":
                 bot.send_message(TELEGRAM_CHAT_ID, "🏁 *Secuencia finalizada por el usuario.*", parse_mode="Markdown")
