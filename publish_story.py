@@ -2399,7 +2399,7 @@ def process_catalog(
 # ============================================================
 
 if __name__ == "__main__":
-
-    process_catalog(
-        auto_approve=False
-    )
+    # Si se ejecuta desde GitHub Actions, pasamos auto_approve=True
+    # para que procese y publique directo sin bloquearse esperando polling.
+    auto_mode = os.environ.get("AUTO_APPROVE", "false").lower() == "true"
+    process_catalog(auto_approve=auto_mode)
