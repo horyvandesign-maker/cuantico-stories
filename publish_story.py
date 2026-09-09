@@ -151,7 +151,7 @@ def create_story_template(product, img_obj):
     if product["is_on_demand"]:
         accent_color = ON_DEMAND_COLOR
         display_label = ">> PRODUCTO POR ENCARGUE <<"
-        cta_text = "📩 Respondé 'QUIERO' por DM o buscalo en cuanticopc.com.ar"
+        cta_text = "-> Respondé 'QUIERO' por DM o buscalo en cuanticopc.com.ar <-"
     else:
         accent_color = random.choice(ACCENT_COLORS)
         display_label = product["price"]
