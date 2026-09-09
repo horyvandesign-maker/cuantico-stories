@@ -99,25 +99,30 @@ def fetch_all_catalog_products():
             images = product.get("images", [])
             if not images:
                 continue
-            
+
             prices_info = product.get("prices", {})
             raw_price = prices_info.get("price")
             
+            # Validación estricta: Si la API devuelve 'is_in_stock': False o stock 'outofstock'
+            stock_status = str(product.get("stock_status", "")).lower()
+            is_in_stock = product.get("is_in_stock", True)
+
+            # Convertir precio a entero seguro
             price_val = 0
-            if raw_price is not None:
+            if raw_price is not None and str(raw_price).strip() != "":
                 try:
                     price_val = int(raw_price)
                 except ValueError:
                     price_val = 0
 
-            # Muestra el precio si es mayor a 0; si es 0 o nulo pasa a "POR ENCARGUE"
-            if price_val > 0:
+            # SI ESTÁ AGOTADO O EL PRECIO ES 0/VACÍO -> POR ENCARGUE
+            if not is_in_stock or stock_status == "outofstock" or price_val <= 0:
+                is_on_demand = True
+                formatted_price = "POR ENCARGUE"
+            else:
                 is_on_demand = False
                 val_final = price_val / 100
                 formatted_price = f"${val_final:,.0f}".replace(",", ".")
-            else:
-                is_on_demand = True
-                formatted_price = "POR ENCARGUE"
 
             catalog.append({
                 "id": product.get("id"),
