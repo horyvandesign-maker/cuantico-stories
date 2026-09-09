@@ -119,7 +119,7 @@ def fetch_all_catalog_products():
                     price_val = 0
 
             # SI NO ESTÁ EN STOCK, NO ES COMPRABLE O SU PRECIO ES 0 -> POR ENCARGUE
-            if not is_in_stock or stock_status in ["outofstock", "onbackorder"] or not is_purchasable or price_val <= 0:
+            if not is_in_stock or is_on_backorder or not is_purchasable or price_val <= 0:
                 is_on_demand = True
                 formatted_price = "POR ENCARGUE"
             else:
