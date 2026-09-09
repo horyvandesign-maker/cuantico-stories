@@ -99,9 +99,6 @@ def fetch_all_catalog_products():
             images = product.get("images", [])
             if not images:
                 continue
-
-            stock_status = str(product.get("stock_status", "")).lower()
-            is_in_stock = product.get("is_in_stock", True)
             
             prices_info = product.get("prices", {})
             raw_price = prices_info.get("price")
@@ -113,13 +110,14 @@ def fetch_all_catalog_products():
                 except ValueError:
                     price_val = 0
 
-if price_val > 0:
-    is_on_demand = False
-    val_final = price_val / 100
-    formatted_price = f"${val_final:,.0f}".replace(",", ".")
-else:
-    is_on_demand = True
-    formatted_price = "POR ENCARGUE"
+            # Muestra el precio si es mayor a 0; si es 0 o nulo pasa a "POR ENCARGUE"
+            if price_val > 0:
+                is_on_demand = False
+                val_final = price_val / 100
+                formatted_price = f"${val_final:,.0f}".replace(",", ".")
+            else:
+                is_on_demand = True
+                formatted_price = "POR ENCARGUE"
 
             catalog.append({
                 "id": product.get("id"),
