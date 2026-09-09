@@ -15,7 +15,6 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from google import genai
 
-
 # ============================================================
 # CONFIGURACIÓN
 # ============================================================
@@ -839,6 +838,7 @@ def generate_ai_title(
 # ============================================================
 
 def fetch_all_catalog_products():
+    from datetime import datetime
 
     endpoint = (
         f"{SITE_URL}/wp-json/"
@@ -859,8 +859,7 @@ def fetch_all_catalog_products():
     catalog = []
     page = 1
 
-    history = load_history()
-
+    # Traemos todos los productos del catálogo web
     while True:
 
         params = {
@@ -870,104 +869,47 @@ def fetch_all_catalog_products():
         }
 
         try:
-
             response = requests.get(
                 endpoint,
                 params=params,
                 headers=headers,
                 timeout=20,
             )
-
         except requests.RequestException as error:
-
-            print(
-                f"Error WooCommerce: {error}"
-            )
-
+            print(f"Error WooCommerce: {error}")
             break
 
         if response.status_code != 200:
-
-            print(
-                "WooCommerce respondió "
-                f"{response.status_code}"
-            )
-
             break
 
         try:
             items = response.json()
-
         except Exception:
-
-            print(
-                "WooCommerce devolvió "
-                "una respuesta inválida."
-            )
-
             break
 
         if not items:
             break
 
         for product in items:
-
-            prod_id = product.get("id")
-
-            if prod_id in history:
-                continue
-
-            images = product.get(
-                "images",
-                []
-            )
-
+            images = product.get("images", [])
             if not images:
                 continue
 
-            raw_image_url = (
-                images[0].get("src", "")
-            )
-
+            raw_image_url = images[0].get("src", "")
             if not raw_image_url:
                 continue
 
-            prices_info = product.get(
-                "prices",
-                {}
-            )
+            prices_info = product.get("prices", {})
+            raw_price = prices_info.get("price")
 
-            raw_price = prices_info.get(
-                "price"
-            )
-
-            is_in_stock = product.get(
-                "is_in_stock",
-                True,
-            )
-
-            is_on_backorder = product.get(
-                "is_on_backorder",
-                False,
-            )
-
-            is_purchasable = product.get(
-                "is_purchasable",
-                True,
-            )
+            is_in_stock = product.get("is_in_stock", True)
+            is_on_backorder = product.get("is_on_backorder", False)
+            is_purchasable = product.get("is_purchasable", True)
 
             price_val = 0
-
-            if (
-                raw_price is not None
-                and str(raw_price).strip()
-            ):
-
+            if raw_price is not None and str(raw_price).strip():
                 try:
-                    price_val = int(
-                        raw_price
-                    )
-
+                    price_val = int(raw_price)
                 except (ValueError, TypeError):
                     price_val = 0
 
@@ -977,55 +919,41 @@ def fetch_all_catalog_products():
                 or not is_purchasable
                 or price_val <= 0
             ):
-
                 is_on_demand = True
-                formatted_price = (
-                    "POR ENCARGUE"
-                )
-
+                formatted_price = "POR ENCARGUE"
             else:
-
                 is_on_demand = False
-
-                val_final = (
-                    price_val / 100
-                )
-
-                formatted_price = (
-                    f"${val_final:,.0f}"
-                    .replace(",", ".")
-                )
+                val_final = price_val / 100
+                formatted_price = f"${val_final:,.0f}".replace(",", ".")
 
             catalog.append(
                 {
-                    "id": prod_id,
+                    "id": product.get("id"),
                     "original_name": clean_text(
-                        product.get(
-                            "name",
-                            "Producto Cuantico",
-                        )
+                        product.get("name", "Producto Cuantico")
                     ),
                     "price": formatted_price,
-                    "is_on_demand": (
-                        is_on_demand
-                    ),
+                    "is_on_demand": is_on_demand,
                     "raw_url": raw_image_url,
-                    "permalink": product.get(
-                        "permalink",
-                        SITE_URL,
-                    ),
+                    "permalink": product.get("permalink", SITE_URL),
                 }
             )
 
         page += 1
 
-    print(
-        "Total productos nuevos: "
-        f"{len(catalog)}"
-    )
+    if not catalog:
+        return []
 
-    return catalog
+    # APLICAMOS ROTACIÓN: Seleccionamos un único producto según la fecha y hora actual
+    now = datetime.now()
+    # Rota el índice cada 12 horas (mañana / tarde) asegurando ciclo continuo
+    run_index = (now.toordinal() * 2 + (0 if now.hour < 14 else 1)) % len(catalog)
+    selected_product = catalog[run_index]
 
+    print(f"Producto seleccionado por rotación: {selected_product['original_name']}")
+    
+    # Devolvemos una lista con un solo elemento para mantener la estructura del bucle principal
+    return [selected_product]
 
 # ============================================================
 # CREACIÓN DE STORY
@@ -2040,51 +1968,35 @@ def delete_local_file(path):
 def process_catalog(
     auto_approve=False,
 ):
-
     products = (
         fetch_all_catalog_products()
     )
-
     if not products:
-
         if bot:
-
             bot.send_message(
                 TELEGRAM_CHAT_ID,
                 "❌ No hay productos nuevos "
                 "para publicar.",
             )
-
         return
-
     headers = {
         "User-Agent": (
             "Mozilla/5.0 "
             "(Windows NT 10.0; Win64; x64)"
         )
     }
-
     total = len(products)
-
     if bot:
-
         bot.send_message(
             TELEGRAM_CHAT_ID,
-            (
-                "🚀 <b>Catálogo preparado:</b> "
-                f"{total} productos "
-                "sin publicar."
-            ),
+            "🚀 <b>Sistema de rotación activo:</b> Procesando producto en turno.",
             parse_mode="HTML",
         )
-
     for index, product in enumerate(
         products,
         start=1,
     ):
-
         image_path = None
-
         try:
 
             # ------------------------------------------------
