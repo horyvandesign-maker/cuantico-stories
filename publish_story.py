@@ -1,6 +1,7 @@
 import os
 import time
 import html
+import json
 import textwrap
 import random
 import requests
@@ -10,6 +11,7 @@ import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from google import genai
 
+# VARIABLES DE ENTORNO
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 IG_USER_ID = os.environ.get("IG_USER_ID")
@@ -17,6 +19,8 @@ ACCESS_TOKEN = os.environ.get("INSTAGRAM_ACCESS_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 SITE_URL = "https://cuanticopc.com.ar"
+HISTORY_FILE = "published_history.json"
+
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN) if TELEGRAM_BOT_TOKEN else None
 
 ACCENT_COLORS = ["#00FF88", "#00E5FF", "#B000FF"]
@@ -24,6 +28,25 @@ ON_DEMAND_COLOR = "#FFB703"
 
 user_choice = {"action": None}
 
+# --- CONTROL DE HISTORIAL (Evita publicar repetidos) ---
+def load_history():
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def save_to_history(product_id):
+    history = load_history()
+    if product_id not in history:
+        history.append(product_id)
+        # Guardar solo los últimos 200 productos para no saturar
+        with open(HISTORY_FILE, "w") as f:
+            json.dump(history[-200:], f)
+
+# --- BOT LISTENERS ---
 @bot.callback_query_handler(func=lambda call: True)
 def global_callback_listener(call):
     if call.data.startswith("approve_"):
@@ -54,15 +77,17 @@ def clean_text(text):
     decoded = html.unescape(text)
     return decoded.replace('"', "'").replace("”", "'").strip()
 
-def generate_ai_title(original_title):
+# --- GEMINI AI CON MARKETING SEGMENTADO ---
+def generate_ai_title(original_title, permalink=""):
     if not GEMINI_API_KEY:
         return original_title
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
         prompt = (
-            f"Transforma este título técnico de producto de computación en un texto comercial "
-            f"atractivo y conciso para una Instagram Story (máximo 7 palabras, sin emojis, sin comillas):\n\n"
-            f"Producto: {original_title}"
+            f"Analizá este producto de tecnología: '{original_title}'. "
+            f"Identificá si es Gamer, Productividad/Oficina o Conectividad/Redes. "
+            f"Crea un título comercial directo e irresistible para una Instagram Story. "
+            f"REGLAS: Máximo 6 palabras, sin emojis, sin comillas, en español latino."
         )
         response = client.models.generate_content(
             model='gemini-2.5-flash',
@@ -74,6 +99,7 @@ def generate_ai_title(original_title):
         print(f"Fallback a título original: {e}")
         return original_title
 
+# --- EXTRACCIÓN DE CATÁLOGO ---
 def fetch_all_catalog_products():
     endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
     headers = {
@@ -84,6 +110,7 @@ def fetch_all_catalog_products():
     
     catalog = []
     page = 1
+    history = load_history()
     
     while True:
         params = {"per_page": 50, "page": page, "_nocache": int(time.time())}
@@ -96,6 +123,12 @@ def fetch_all_catalog_products():
             break
             
         for product in items:
+            prod_id = product.get("id")
+            
+            # FILTRO: Saltear si ya fue publicado recientemente
+            if prod_id in history:
+                continue
+
             images = product.get("images", [])
             if not images:
                 continue
@@ -103,13 +136,9 @@ def fetch_all_catalog_products():
             prices_info = product.get("prices", {})
             raw_price = prices_info.get("price")
             
-            # Chequeos de stock propios de la Store API
             is_in_stock = product.get("is_in_stock", True)
             is_on_backorder = product.get("is_on_backorder", False)
-            
-            # Verificar disponibilidad real
             is_purchasable = product.get("is_purchasable", True)
-            has_options = product.get("has_options", False)
 
             price_val = 0
             if raw_price is not None and str(raw_price).strip() != "":
@@ -118,7 +147,6 @@ def fetch_all_catalog_products():
                 except ValueError:
                     price_val = 0
 
-            # SI NO ESTÁ EN STOCK, NO ES COMPRABLE O SU PRECIO ES 0 -> POR ENCARGUE
             if not is_in_stock or is_on_backorder or not is_purchasable or price_val <= 0:
                 is_on_demand = True
                 formatted_price = "POR ENCARGUE"
@@ -128,11 +156,12 @@ def fetch_all_catalog_products():
                 formatted_price = f"${val_final:,.0f}".replace(",", ".")
 
             catalog.append({
-                "id": product.get("id"),
+                "id": prod_id,
                 "original_name": clean_text(product.get("name", "Producto Cuantico")),
                 "price": formatted_price,
                 "is_on_demand": is_on_demand,
-                "raw_url": images[0].get("src", "")
+                "raw_url": images[0].get("src", ""),
+                "permalink": product.get("permalink", SITE_URL)
             })
             
         page += 1
@@ -151,17 +180,18 @@ def draw_vertical_gradient(draw_obj, rect, color_top, color_bottom):
         a = int(color_top[3] * (1 - ratio) + color_bottom[3] * ratio)
         draw_obj.line([(x1, y1 + i), (x2, y1 + i)], fill=(r, g, b, a))
 
+# --- MOTOR DE DISEÑO CON SOMBRA 3D Y TIPOGRAFÍA LIMPIA ---
 def create_story_template(product, img_obj):
     canvas_w, canvas_h = 1080, 1920
     
     if product["is_on_demand"]:
         accent_color = ON_DEMAND_COLOR
         display_label = ">> PRODUCTO POR ENCARGUE <<"
-        cta_text = "Respondé 'QUIERO' por DM o buscalo en cuanticopc.com.ar"
+        cta_text = "Respondé 'QUIERO' por DM o tocá el enlace"
     else:
         accent_color = random.choice(ACCENT_COLORS)
         display_label = product["price"]
-        cta_text = "Link a la tienda en la Bio | cuanticopc.com.ar"
+        cta_text = "Tocá la tarjeta para ver en la tienda"
     
     bg = img_obj.resize((canvas_w, canvas_h)).filter(ImageFilter.GaussianBlur(50))
     overlay = Image.new("RGBA", (canvas_w, canvas_h), (12, 12, 18, 160))
@@ -177,13 +207,21 @@ def create_story_template(product, img_obj):
     card_x = (canvas_w - card_w) // 2
     card_y = 400
     
-    card_bg = Image.new("RGBA", (card_w, card_h), (255, 255, 255, 240))
+    # EFECTO SOMBRA PARALELA (DROP SHADOW 3D)
+    shadow = Image.new("RGBA", (card_w + 40, card_h + 40), (0, 0, 0, 0))
+    shadow_draw = ImageDraw.Draw(shadow)
+    shadow_draw.rounded_rectangle((20, 20, card_w + 20, card_h + 20), radius=35, fill=(0, 0, 0, 120))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(25))
+    bg.paste(shadow, (card_x - 20, card_y - 10), shadow)
+    
+    # TARJETA BLANCA CENTRAL
+    card_bg = Image.new("RGBA", (card_w, card_h), (255, 255, 255, 245))
     card_mask = Image.new("L", (card_w, card_h), 0)
     card_mask_draw = ImageDraw.Draw(card_mask)
     card_mask_draw.rounded_rectangle((0, 0, card_w, card_h), radius=35, fill=255)
-    
     bg.paste(card_bg, (card_x, card_y), card_mask)
     
+    # REDIMENSIONAMIENTO INTELIGENTE DEL PRODUCTO
     img_copy = img_obj.copy()
     img_copy.thumbnail((760, 760))
     p_w, p_h = img_copy.size
@@ -193,21 +231,14 @@ def create_story_template(product, img_obj):
     
     draw = ImageDraw.Draw(bg)
     
+    # LOGOTIPO
     logo_path = os.path.join(os.path.dirname(__file__), "logo_canva.png")
     if os.path.exists(logo_path):
         try:
             logo_img = Image.open(logo_path).convert("RGBA")
             logo_img.thumbnail((550, 220))
             l_w, l_h = logo_img.size
-            chosen_pos = random.choice(["left", "center", "right"])
-            
-            if chosen_pos == "left":
-                logo_x = 50
-            elif chosen_pos == "right":
-                logo_x = canvas_w - l_w - 50
-            else:
-                logo_x = (canvas_w - l_w) // 2
-                
+            logo_x = (canvas_w - l_w) // 2
             logo_y = 100
             bg.paste(logo_img, (logo_x, logo_y), logo_img)
         except Exception:
@@ -215,25 +246,24 @@ def create_story_template(product, img_obj):
     else:
         draw.text((canvas_w // 2, 150), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
     
-    font_title = get_font(40)
-    wrapped_lines = textwrap.wrap(product["ai_name"], width=24)
+    # TÍTULO
+    font_title = get_font(42)
+    wrapped_lines = textwrap.wrap(product["ai_name"], width=22)
     wrapped_text = "\n".join(wrapped_lines[:2])
     
     title_y = card_y + card_h + 80
     draw.multiline_text((canvas_w // 2, title_y), wrapped_text, fill="#FFFFFF", font=font_title, anchor="mm", align="center")
     
-    font_size = 38 if product["is_on_demand"] else 56
+    # BADGE DE PRECIO / ENCARGUE
+    font_size = 36 if product["is_on_demand"] else 56
     font_badge = get_font(font_size)
     
     bbox = draw.textbbox((0, 0), display_label, font=font_badge)
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
     
-    badge_padding_x = 40
-    badge_padding_y = 20
-    badge_w = text_w + (badge_padding_x * 2)
-    badge_h = text_h + (badge_padding_y * 2)
-    
+    badge_w = text_w + 80
+    badge_h = text_h + 40
     badge_x1 = (canvas_w - badge_w) // 2
     badge_y1 = title_y + 90
     badge_x2 = badge_x1 + badge_w
@@ -242,7 +272,7 @@ def create_story_template(product, img_obj):
     draw.rounded_rectangle((badge_x1, badge_y1, badge_x2, badge_y2), radius=25, fill=(18, 22, 28, 240), outline=accent_color, width=3)
     draw.text(((badge_x1 + badge_x2) // 2, (badge_y1 + badge_y2) // 2 - 3), display_label, fill=accent_color, font=font_badge, anchor="mm")
     
-    # BANNER FLOTANTE INFERIOR CON LLAMADO A LA ACCIÓN (CTA)
+    # FOOTER CTA (Limpio, sin caracteres rotos)
     cta_box_w, cta_box_h = 980, 85
     cta_x1 = (canvas_w - cta_box_w) // 2
     cta_y1 = canvas_h - 170
@@ -257,11 +287,8 @@ def create_story_template(product, img_obj):
     output_path = f"story_{product['id']}.jpg"
     bg.save(output_path, "JPEG", quality=95)
     return output_path
-    
+
 def upload_local_image_to_web(local_filepath):
-    """
-    Sube la imagen armada a una pasarela alternativa ultra estable (FreeImage.host)
-    """
     url = "https://freeimage.host/api/1/upload"
     try:
         with open(local_filepath, "rb") as file:
@@ -274,34 +301,54 @@ def upload_local_image_to_web(local_filepath):
     except Exception as e:
         print(f"Error en servidor principal de imágenes: {e}")
 
-    # Fallback 2: Subida por transferencia
     try:
         with open(local_filepath, "rb") as file:
             res = requests.post("https://tmpfiles.org/api/v1/upload", files={"file": file}, timeout=15)
             data = res.json()
             if "data" in data and "url" in data["data"]:
-                # Convertir URL de vista previa a URL directa de imagen
-                direct_url = data["data"]["url"].replace("tmpfiles.org/", "tmpfiles.org/dl/")
-                return direct_url
+                return data["data"]["url"].replace("tmpfiles.org/", "tmpfiles.org/dl/")
     except Exception as e:
         print(f"Error en servidor secundario de imágenes: {e}")
 
     return None
 
-def publish_to_instagram(local_image_path):
+# --- PUBLICACIÓN EN INSTAGRAM CON STICKER DE ENLACE ---
+def publish_to_instagram(local_image_path, product_link):
     public_image_url = upload_local_image_to_web(local_image_path)
     
     if not public_image_url:
-        return False, "No se pudo obtener una URL pública para la plantilla armada."
+        return False, "No se pudo obtener una URL pública para la imagen."
 
     container_url = f"https://graph.facebook.com/v26.0/{IG_USER_ID}/media"
-    payload = {"image_url": public_image_url, "media_type": "STORIES", "access_token": ACCESS_TOKEN}
+    
+    # Sticker de enlace posicionado en la parte inferior sobre la barra CTA
+    link_sticker = {
+        "link_material_option": 0,
+        "url": product_link,
+        "x": 0.5,
+        "y": 0.9,
+        "width": 0.6,
+        "height": 0.1,
+        "rotation": 0.0
+    }
+    
+    payload = {
+        "image_url": public_image_url,
+        "media_type": "STORIES",
+        "story_sticker_ids": json.dumps([link_sticker]),
+        "access_token": ACCESS_TOKEN
+    }
     
     res = requests.post(container_url, data=payload)
     res_data = res.json()
     
+    # Fallback si Meta rechaza el sticker por permisos del Token
     if "id" not in res_data:
-        return False, res_data
+        payload.pop("story_sticker_ids", None)
+        res = requests.post(container_url, data=payload)
+        res_data = res.json()
+        if "id" not in res_data:
+            return False, res_data
         
     container_id = res_data["id"]
     time.sleep(5)
@@ -314,16 +361,19 @@ def publish_to_instagram(local_image_path):
         return True, pub_data["id"]
     return False, pub_data
 
-def process_catalog():
+# --- PROCESO PRINCIPAL ---
+def process_catalog(auto_approve=False):
     products = fetch_all_catalog_products()
     if not products:
-        bot.send_message(TELEGRAM_CHAT_ID, "❌ No se encontraron productos.")
+        if bot:
+            bot.send_message(TELEGRAM_CHAT_ID, "❌ No hay productos nuevos para publicar.")
         return
 
     headers = {"User-Agent": "Mozilla/5.0"}
     total = len(products)
     
-    bot.send_message(TELEGRAM_CHAT_ID, f"🚀 *Catálogo preparado:* {total} productos en total.", parse_mode="Markdown")
+    if bot:
+        bot.send_message(TELEGRAM_CHAT_ID, f"🚀 *Catálogo preparado:* {total} productos sin publicar.", parse_mode="Markdown")
 
     for index, prod in enumerate(products, start=1):
         try:
@@ -333,9 +383,21 @@ def process_catalog():
                 
             img_obj = Image.open(BytesIO(img_res.content)).convert("RGB")
             
-            prod["ai_name"] = generate_ai_title(prod["original_name"])
+            prod["ai_name"] = generate_ai_title(prod["original_name"], prod["permalink"])
             image_path = create_story_template(prod, img_obj)
             
+            # MODO AUTOMÁTICO (Cronjob/Sin interacción)
+            if auto_approve:
+                success, result = publish_to_instagram(image_path, prod["permalink"])
+                if success:
+                    save_to_history(prod["id"])
+                    print(f"[{index}/{total}] Publicado automáticamente en IG.")
+                if os.path.exists(image_path):
+                    os.remove(image_path)
+                time.sleep(10)
+                continue
+
+            # MODO TELEGRAM INTERACTIVO
             markup = InlineKeyboardMarkup()
             markup.row(
                 InlineKeyboardButton("✅ Publicar Story", callback_data=f"approve_{prod['id']}"),
@@ -346,7 +408,8 @@ def process_catalog():
             type_str = "📦 POR ENCARGUE" if prod["is_on_demand"] else f"💰 {prod['price']}"
             caption = (
                 f"📦 *[{index}/{total}] {prod['original_name']}*\n"
-                f"Estado asignado: *{type_str}*\n\n"
+                f"Estado asignado: *{type_str}*\n"
+                f"🔗 [Ver en Tienda]({prod['permalink']})\n\n"
                 f"¿Deseas enviar esta Story a Instagram?"
             )
             
@@ -357,9 +420,10 @@ def process_catalog():
             bot.polling(timeout=300, non_stop=False)
             
             if user_choice["action"] == "approve":
-                success, result = publish_to_instagram(image_path)
+                success, result = publish_to_instagram(image_path, prod["permalink"])
                 if success:
-                    bot.send_message(TELEGRAM_CHAT_ID, "🎉 ¡Publicado con éxito el diseño final en Instagram Stories!", parse_mode="Markdown")
+                    save_to_history(prod["id"])
+                    bot.send_message(TELEGRAM_CHAT_ID, "🎉 ¡Publicado con éxito en Instagram Stories!", parse_mode="Markdown")
                 else:
                     bot.send_message(TELEGRAM_CHAT_ID, f"❌ Error Meta: `{result}`", parse_mode="Markdown")
                 time.sleep(3)
@@ -378,4 +442,5 @@ def process_catalog():
             continue
 
 if __name__ == "__main__":
-    process_catalog()
+    # Cambiar a process_catalog(auto_approve=True) si se va a usar en un Cronjob 100% automático
+    process_catalog(auto_approve=False)
