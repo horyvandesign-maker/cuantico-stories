@@ -11,7 +11,9 @@ import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from google import genai
 
-# VARIABLES DE ENTORNO
+# ==========================================
+# CONFIGURACIÓN Y VARIABLES DE ENTORNO
+# ==========================================
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 IG_USER_ID = os.environ.get("IG_USER_ID")
@@ -28,7 +30,9 @@ ON_DEMAND_COLOR = "#FFB703"
 
 user_choice = {"action": None}
 
-# --- CONTROL DE HISTORIAL (Evita publicar repetidos) ---
+# ==========================================
+# HISTORIAL (Evita publicar repetidos)
+# ==========================================
 def load_history():
     if os.path.exists(HISTORY_FILE):
         try:
@@ -42,28 +46,33 @@ def save_to_history(product_id):
     history = load_history()
     if product_id not in history:
         history.append(product_id)
-        # Guardar solo los últimos 200 productos para no saturar
+        # Guardar solo los últimos 200 productos
         with open(HISTORY_FILE, "w") as f:
             json.dump(history[-200:], f)
 
-# --- BOT LISTENERS ---
+# ==========================================
+# BOT LISTENERS (Botones de Telegram)
+# ==========================================
 @bot.callback_query_handler(func=lambda call: True)
 def global_callback_listener(call):
     if call.data.startswith("approve_"):
         user_choice["action"] = "approve"
         bot.answer_callback_query(call.id, "Publicando...")
-        bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption="🚀 *Publicando diseño final en Instagram Stories...*", parse_mode="Markdown")
+        bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption="🚀 <b>Publicando diseño final en Instagram Stories...</b>", parse_mode="HTML")
     elif call.data.startswith("skip_"):
         user_choice["action"] = "skip"
         bot.answer_callback_query(call.id, "Salteado.")
-        bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption="⏭️ *Producto salteado.*", parse_mode="Markdown")
+        bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption="⏭️ <b>Producto salteado.</b>", parse_mode="HTML")
     elif call.data == "stop":
         user_choice["action"] = "stop"
         bot.answer_callback_query(call.id, "Deteniendo proceso...")
-        bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption="🛑 *Proceso detenido.*", parse_mode="Markdown")
+        bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption="🛑 <b>Proceso detenido.</b>", parse_mode="HTML")
     
     bot.stop_polling()
 
+# ==========================================
+# UTILIDADES GRÁFICAS Y TEXTO
+# ==========================================
 def get_font(size):
     try:
         return ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", size)
@@ -77,7 +86,33 @@ def clean_text(text):
     decoded = html.unescape(text)
     return decoded.replace('"', "'").replace("”", "'").strip()
 
-# --- GEMINI AI CON MARKETING SEGMENTADO ---
+def hex_to_rgb(hex_str):
+    """Convierte un string hexadecimal a tupla RGB"""
+    hex_str = hex_str.lstrip('#')
+    return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
+
+def draw_vertical_gradient(draw_obj, rect, color_top, color_bottom):
+    x1, y1, x2, y2 = rect
+    height = y2 - y1
+    for i in range(height):
+        ratio = i / float(height)
+        r = int(color_top[0] * (1 - ratio) + color_bottom[0] * ratio)
+        g = int(color_top[1] * (1 - ratio) + color_bottom[1] * ratio)
+        b = int(color_top[2] * (1 - ratio) + color_bottom[2] * ratio)
+        a = int(color_top[3] * (1 - ratio) + color_bottom[3] * ratio)
+        draw_obj.line([(x1, y1 + i), (x2, y1 + i)], fill=(r, g, b, a))
+
+def draw_neon_glow_line(draw_obj, points, color_rgb, width=6, glow_intensity=4):
+    """Dibuja líneas neón con mayor grosor y presencia visual"""
+    for i in range(glow_intensity, 0, -1):
+        alpha = int(255 / (i * 1.5))
+        w = width + (i * 6)
+        draw_obj.line(points, fill=(color_rgb[0], color_rgb[1], color_rgb[2], alpha), width=w)
+    draw_obj.line(points, fill=(255, 255, 255, 240), width=width)
+
+# ==========================================
+# INTELIGENCIA ARTIFICIAL (Gemini)
+# ==========================================
 def generate_ai_title(original_title, permalink=""):
     if not GEMINI_API_KEY:
         return original_title
@@ -99,7 +134,9 @@ def generate_ai_title(original_title, permalink=""):
         print(f"Fallback a título original: {e}")
         return original_title
 
-# --- EXTRACCIÓN DE CATÁLOGO ---
+# ==========================================
+# EXTRACCIÓN DE PRODUCTOS WOOCOMMERCE
+# ==========================================
 def fetch_all_catalog_products():
     endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
     headers = {
@@ -125,7 +162,7 @@ def fetch_all_catalog_products():
         for product in items:
             prod_id = product.get("id")
             
-            # FILTRO: Saltear si ya fue publicado recientemente
+            # FILTRO: Saltear si ya fue publicado
             if prod_id in history:
                 continue
 
@@ -169,26 +206,9 @@ def fetch_all_catalog_products():
     print(f"Total productos en catálogo a procesar: {len(catalog)}")
     return catalog
 
-def draw_vertical_gradient(draw_obj, rect, color_top, color_bottom):
-    x1, y1, x2, y2 = rect
-    height = y2 - y1
-    for i in range(height):
-        ratio = i / float(height)
-        r = int(color_top[0] * (1 - ratio) + color_bottom[0] * ratio)
-        g = int(color_top[1] * (1 - ratio) + color_bottom[1] * ratio)
-        b = int(color_top[2] * (1 - ratio) + color_bottom[2] * ratio)
-        a = int(color_top[3] * (1 - ratio) + color_bottom[3] * ratio)
-        draw_obj.line([(x1, y1 + i), (x2, y1 + i)], fill=(r, g, b, a))
-
-# --- MOTOR DE DISEÑO CON SOMBRA 3D Y TIPOGRAFÍA LIMPIA ---
-def draw_neon_glow_line(draw_obj, points, color_rgb, width=6, glow_intensity=4):
-    """Dibuja líneas neón con mayor grosor y presencia visual"""
-    for i in range(glow_intensity, 0, -1):
-        alpha = int(255 / (i * 1.5))
-        w = width + (i * 6)
-        draw_obj.line(points, fill=(color_rgb[0], color_rgb[1], color_rgb[2], alpha), width=w)
-    draw_obj.line(points, fill=(255, 255, 255, 240), width=width)
-
+# ==========================================
+# MOTOR GRÁFICO (Plantilla Neón / Cyberpunk)
+# ==========================================
 def create_story_template(product, img_obj):
     canvas_w, canvas_h = 1080, 1920
     
@@ -198,7 +218,7 @@ def create_story_template(product, img_obj):
         display_label = ">> PRODUCTO POR ENCARGUE <<"
         cta_text = "Respondé 'QUIERO' por DM o tocá el enlace"
     else:
-        accent_hex = random.choice(ACCENT_COLORS) # Cyan, Verde Neón o Violeta
+        accent_hex = random.choice(ACCENT_COLORS)
         display_label = product["price"]
         cta_text = "Tocá la tarjeta para ver en la tienda"
         
@@ -213,7 +233,7 @@ def create_story_template(product, img_obj):
     tech_layer = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     t_draw = ImageDraw.Draw(tech_layer)
     
-    # 3. LÍNEAS NEÓN MÁS REFORZADAS Y NOTORIAS (Visual Cyberpunk)
+    # 3. LÍNEAS NEÓN REFORZADAS
     # Esquina Superior Izquierda
     draw_neon_glow_line(t_draw, [(0, 200), (250, 200), (350, 300)], accent_rgb, width=6, glow_intensity=4)
     t_draw.line([(0, 220), (230, 220)], fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 160), width=2)
@@ -234,7 +254,7 @@ def create_story_template(product, img_obj):
     # 4. TARJETA CENTRAL Y GLOW AMBIENTAL
     card_w, card_h = 860, 860
     card_x = (canvas_w - card_w) // 2
-    card_y = 410  # Bajada ligera para dejar espacio superior libre
+    card_y = 410
     
     # Halo de Luz ambiental detrás
     glow_bg = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
@@ -269,7 +289,7 @@ def create_story_template(product, img_obj):
 
     draw = ImageDraw.Draw(bg)
 
-    # 6. LOGOTIPO (Zona segura superior ~160px)
+    # 6. LOGOTIPO (Zona segura superior)
     logo_path = os.path.join(os.path.dirname(__file__), "logo_canva.png")
     if os.path.exists(logo_path):
         try:
@@ -277,7 +297,7 @@ def create_story_template(product, img_obj):
             logo_img.thumbnail((550, 200))
             l_w, l_h = logo_img.size
             logo_x = (canvas_w - l_w) // 2
-            bg.paste(logo_img, (logo_x, 160), logo_img) # Bajado a 160px
+            bg.paste(logo_img, (logo_x, 160), logo_img)
         except Exception:
             draw.text((canvas_w // 2, 180), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
     else:
@@ -291,7 +311,7 @@ def create_story_template(product, img_obj):
     title_y = card_y + card_h + 80
     draw.multiline_text((canvas_w // 2, title_y), wrapped_text, fill="#FFFFFF", font=font_title, anchor="mm", align="center")
 
-    # 8. BADGE FUTURISTA CON MÁS MARGEN Y FIX DE NOMBRES
+    # 8. BADGE FUTURISTA
     font_size = 36 if product["is_on_demand"] else 54
     font_badge = get_font(font_size)
     
@@ -299,8 +319,8 @@ def create_story_template(product, img_obj):
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
     
-    badge_w = text_w + 100  # Mayor holgura lateral
-    badge_h = text_h + 46   # Mayor holgura vertical
+    badge_w = text_w + 100
+    badge_h = text_h + 46
     badge_x1 = (canvas_w - badge_w) // 2
     badge_y1 = title_y + 85
     badge_x2 = badge_x1 + badge_w
@@ -309,18 +329,15 @@ def create_story_template(product, img_obj):
     # Fondo Badge oscuro con resplandor neón
     draw.rounded_rectangle((badge_x1 - 2, badge_y1 - 2, badge_x2 + 2, badge_y2 + 2), radius=22, fill=accent_rgb)
     draw.rounded_rectangle((badge_x1, badge_y1, badge_x2, badge_y2), radius=20, fill=(12, 14, 20, 255))
-    
-    # FIX: accent_hex reemplaza a la variable errónea accent_color
     draw.text(((badge_x1 + badge_x2) // 2, (badge_y1 + badge_y2) // 2 - 2), display_label, fill=accent_hex, font=font_badge, anchor="mm")
 
-    # 9. BANNER FOOTER ESTILO CYBER (Subido a zona segura)
+    # 9. BANNER FOOTER ESTILO CYBER (Zona segura inferior)
     cta_box_w, cta_box_h = 960, 80
     cta_x1 = (canvas_w - cta_box_w) // 2
-    cta_y1 = canvas_h - 220  # Subido para evitar superposición con el input de DM
+    cta_y1 = canvas_h - 220
     cta_x2 = cta_x1 + cta_box_w
     cta_y2 = cta_y1 + cta_box_h
 
-    # FIX: accent_hex en outline
     draw.rounded_rectangle((cta_x1, cta_y1, cta_x2, cta_y2), radius=16, fill=(15, 18, 25, 230), outline=accent_hex, width=2)
     
     font_cta = get_font(28)
@@ -330,6 +347,9 @@ def create_story_template(product, img_obj):
     bg.save(output_path, "JPEG", quality=95)
     return output_path
 
+# ==========================================
+# PUBLICACIÓN WEB / INSTAGRAM
+# ==========================================
 def upload_local_image_to_web(local_filepath):
     url = "https://freeimage.host/api/1/upload"
     try:
@@ -354,7 +374,6 @@ def upload_local_image_to_web(local_filepath):
 
     return None
 
-# --- PUBLICACIÓN EN INSTAGRAM CON STICKER DE ENLACE ---
 def publish_to_instagram(local_image_path, product_link):
     public_image_url = upload_local_image_to_web(local_image_path)
     
@@ -363,7 +382,6 @@ def publish_to_instagram(local_image_path, product_link):
 
     container_url = f"https://graph.facebook.com/v26.0/{IG_USER_ID}/media"
     
-    # Sticker de enlace posicionado en la parte inferior sobre la barra CTA
     link_sticker = {
         "link_material_option": 0,
         "url": product_link,
@@ -384,7 +402,6 @@ def publish_to_instagram(local_image_path, product_link):
     res = requests.post(container_url, data=payload)
     res_data = res.json()
     
-    # Fallback si Meta rechaza el sticker por permisos del Token
     if "id" not in res_data:
         payload.pop("story_sticker_ids", None)
         res = requests.post(container_url, data=payload)
@@ -403,7 +420,9 @@ def publish_to_instagram(local_image_path, product_link):
         return True, pub_data["id"]
     return False, pub_data
 
-# --- PROCESO PRINCIPAL ---
+# ==========================================
+# CICLO PRINCIPAL
+# ==========================================
 def process_catalog(auto_approve=False):
     products = fetch_all_catalog_products()
     if not products:
@@ -415,7 +434,7 @@ def process_catalog(auto_approve=False):
     total = len(products)
     
     if bot:
-        bot.send_message(TELEGRAM_CHAT_ID, f"🚀 *Catálogo preparado:* {total} productos sin publicar.", parse_mode="Markdown")
+        bot.send_message(TELEGRAM_CHAT_ID, f"🚀 <b>Catálogo preparado:</b> {total} productos sin publicar.", parse_mode="HTML")
 
     for index, prod in enumerate(products, start=1):
         try:
@@ -428,7 +447,6 @@ def process_catalog(auto_approve=False):
             prod["ai_name"] = generate_ai_title(prod["original_name"], prod["permalink"])
             image_path = create_story_template(prod, img_obj)
             
-            # MODO AUTOMÁTICO (Cronjob/Sin interacción)
             if auto_approve:
                 success, result = publish_to_instagram(image_path, prod["permalink"])
                 if success:
@@ -439,7 +457,6 @@ def process_catalog(auto_approve=False):
                 time.sleep(10)
                 continue
 
-            # MODO TELEGRAM INTERACTIVO
             markup = InlineKeyboardMarkup()
             markup.row(
                 InlineKeyboardButton("✅ Publicar Story", callback_data=f"approve_{prod['id']}"),
@@ -448,15 +465,17 @@ def process_catalog(auto_approve=False):
             )
             
             type_str = "📦 POR ENCARGUE" if prod["is_on_demand"] else f"💰 {prod['price']}"
+            
+            # TEXTO EN FORMATO HTML PARA EVITAR ERRORES DE MARKDOWN CON NOMBRES RAROS
             caption = (
-                f"📦 *[{index}/{total}] {prod['original_name']}*\n"
-                f"Estado asignado: *{type_str}*\n"
-                f"🔗 [Ver en Tienda]({prod['permalink']})\n\n"
+                f"📦 <b>[{index}/{total}] {html.escape(prod['original_name'])}</b>\n"
+                f"Estado asignado: <b>{type_str}</b>\n"
+                f"🔗 <a href='{prod['permalink']}'>Ver en Tienda</a>\n\n"
                 f"¿Deseas enviar esta Story a Instagram?"
             )
             
             with open(image_path, "rb") as photo:
-                bot.send_photo(TELEGRAM_CHAT_ID, photo, caption=caption, reply_markup=markup, parse_mode="Markdown")
+                bot.send_photo(TELEGRAM_CHAT_ID, photo, caption=caption, reply_markup=markup, parse_mode="HTML")
                 
             user_choice["action"] = None
             bot.polling(timeout=300, non_stop=False)
@@ -465,13 +484,13 @@ def process_catalog(auto_approve=False):
                 success, result = publish_to_instagram(image_path, prod["permalink"])
                 if success:
                     save_to_history(prod["id"])
-                    bot.send_message(TELEGRAM_CHAT_ID, "🎉 ¡Publicado con éxito en Instagram Stories!", parse_mode="Markdown")
+                    bot.send_message(TELEGRAM_CHAT_ID, "🎉 <b>¡Publicado con éxito en Instagram Stories!</b>", parse_mode="HTML")
                 else:
-                    bot.send_message(TELEGRAM_CHAT_ID, f"❌ Error Meta: `{result}`", parse_mode="Markdown")
+                    bot.send_message(TELEGRAM_CHAT_ID, f"❌ Error Meta: <code>{result}</code>", parse_mode="HTML")
                 time.sleep(3)
                 
             elif user_choice["action"] == "stop":
-                bot.send_message(TELEGRAM_CHAT_ID, "🏁 *Proceso detenido.*", parse_mode="Markdown")
+                bot.send_message(TELEGRAM_CHAT_ID, "🏁 <b>Proceso detenido.</b>", parse_mode="HTML")
                 if os.path.exists(image_path):
                     os.remove(image_path)
                 break
@@ -484,5 +503,4 @@ def process_catalog(auto_approve=False):
             continue
 
 if __name__ == "__main__":
-    # Cambiar a process_catalog(auto_approve=True) si se va a usar en un Cronjob 100% automático
     process_catalog(auto_approve=False)
