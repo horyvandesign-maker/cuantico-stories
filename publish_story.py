@@ -1132,8 +1132,8 @@ def create_story_template(
 
     bg = background_source
 
-    # --------------------------------------------------------
-    # TEXTURA DE PUNTOS DE FONDO
+# --------------------------------------------------------
+    # TEXTURA DE PUNTOS DE FONDO (VISIBLE)
     # --------------------------------------------------------
 
     texture_layer = Image.new(
@@ -1144,11 +1144,11 @@ def create_story_template(
 
     tex_draw = ImageDraw.Draw(texture_layer)
 
-    for x in range(0, canvas_w, 50):
-        for y in range(0, canvas_h, 50):
+    for x in range(0, canvas_w, 35):
+        for y in range(0, canvas_h, 35):
             tex_draw.ellipse(
                 (x, y, x + 2, y + 2),
-                fill=(255, 255, 255, 14),
+                fill=(255, 255, 255, 55),
             )
 
     bg.alpha_composite(texture_layer)
