@@ -151,9 +151,11 @@ def create_story_template(product, img_obj):
     if product["is_on_demand"]:
         accent_color = ON_DEMAND_COLOR
         display_label = ">> PRODUCTO POR ENCARGUE <<"
+        cta_text = "📩 Respondé 'QUIERO' por DM o buscalo en cuanticopc.com.ar"
     else:
         accent_color = random.choice(ACCENT_COLORS)
         display_label = product["price"]
+        cta_text = "🔗 Link a la tienda en la Bio | cuanticopc.com.ar"
     
     bg = img_obj.resize((canvas_w, canvas_h)).filter(ImageFilter.GaussianBlur(50))
     overlay = Image.new("RGBA", (canvas_w, canvas_h), (12, 12, 18, 160))
@@ -162,12 +164,12 @@ def create_story_template(product, img_obj):
     gradient_layer = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     g_draw = ImageDraw.Draw(gradient_layer)
     draw_vertical_gradient(g_draw, (0, 0, canvas_w, 350), (0, 0, 0, 210), (0, 0, 0, 0))
-    draw_vertical_gradient(g_draw, (0, canvas_h - 350, canvas_w, canvas_h), (0, 0, 0, 0), (0, 0, 0, 230))
+    draw_vertical_gradient(g_draw, (0, canvas_h - 400, canvas_w, canvas_h), (0, 0, 0, 0), (0, 0, 0, 240))
     bg.paste(gradient_layer, (0, 0), gradient_layer)
     
     card_w, card_h = 860, 860
     card_x = (canvas_w - card_w) // 2
-    card_y = 420
+    card_y = 400
     
     card_bg = Image.new("RGBA", (card_w, card_h), (255, 255, 255, 240))
     card_mask = Image.new("L", (card_w, card_h), 0)
@@ -200,42 +202,51 @@ def create_story_template(product, img_obj):
             else:
                 logo_x = (canvas_w - l_w) // 2
                 
-            logo_y = 110
+            logo_y = 100
             bg.paste(logo_img, (logo_x, logo_y), logo_img)
         except Exception:
-            draw.text((canvas_w // 2, 160), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
+            draw.text((canvas_w // 2, 150), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
     else:
-        draw.text((canvas_w // 2, 160), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
+        draw.text((canvas_w // 2, 150), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
     
-    font_title = get_font(42)
-    wrapped_lines = textwrap.wrap(product["ai_name"], width=22)
-    wrapped_text = "\n".join(wrapped_lines[:3])
+    font_title = get_font(40)
+    wrapped_lines = textwrap.wrap(product["ai_name"], width=24)
+    wrapped_text = "\n".join(wrapped_lines[:2])
     
-    title_y = card_y + card_h + 90
+    title_y = card_y + card_h + 80
     draw.multiline_text((canvas_w // 2, title_y), wrapped_text, fill="#FFFFFF", font=font_title, anchor="mm", align="center")
     
-    font_size = 42 if product["is_on_demand"] else 58
+    font_size = 38 if product["is_on_demand"] else 56
     font_badge = get_font(font_size)
     
     bbox = draw.textbbox((0, 0), display_label, font=font_badge)
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
     
-    badge_padding_x = 45
-    badge_padding_y = 22
+    badge_padding_x = 40
+    badge_padding_y = 20
     badge_w = text_w + (badge_padding_x * 2)
     badge_h = text_h + (badge_padding_y * 2)
     
     badge_x1 = (canvas_w - badge_w) // 2
-    badge_y1 = title_y + 110
+    badge_y1 = title_y + 90
     badge_x2 = badge_x1 + badge_w
     badge_y2 = badge_y1 + badge_h
     
     draw.rounded_rectangle((badge_x1, badge_y1, badge_x2, badge_y2), radius=25, fill=(18, 22, 28, 240), outline=accent_color, width=3)
     draw.text(((badge_x1 + badge_x2) // 2, (badge_y1 + badge_y2) // 2 - 3), display_label, fill=accent_color, font=font_badge, anchor="mm")
     
-    font_footer = get_font(38)
-    draw.text((canvas_w // 2, canvas_h - 140), "cuanticopc.com.ar", fill="#DDDDDD", font=font_footer, anchor="mm")
+    # BANNER FLOTANTE INFERIOR CON LLAMADO A LA ACCIÓN (CTA)
+    cta_box_w, cta_box_h = 980, 85
+    cta_x1 = (canvas_w - cta_box_w) // 2
+    cta_y1 = canvas_h - 170
+    cta_x2 = cta_x1 + cta_box_w
+    cta_y2 = cta_y1 + cta_box_h
+    
+    draw.rounded_rectangle((cta_x1, cta_y1, cta_x2, cta_y2), radius=20, fill=(0, 0, 0, 180), outline="#444444", width=2)
+    
+    font_cta = get_font(28)
+    draw.text((canvas_w // 2, (cta_y1 + cta_y2) // 2), cta_text, fill="#EEEEEE", font=font_cta, anchor="mm")
     
     output_path = f"story_{product['id']}.jpg"
     bg.save(output_path, "JPEG", quality=95)
