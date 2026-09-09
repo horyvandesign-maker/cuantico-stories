@@ -103,11 +103,11 @@ def fetch_all_catalog_products():
             prices_info = product.get("prices", {})
             raw_price = prices_info.get("price")
             
-            # Validación estricta: Si la API devuelve 'is_in_stock': False o stock 'outofstock'
-            stock_status = str(product.get("stock_status", "")).lower()
+            # Capturamos el estado de inventario exacto de WooCommerce
+            stock_status = str(product.get("stock_status", "")).lower().strip()
             is_in_stock = product.get("is_in_stock", True)
 
-            # Convertir precio a entero seguro
+            # Convertir precio a valor numérico entero
             price_val = 0
             if raw_price is not None and str(raw_price).strip() != "":
                 try:
@@ -115,8 +115,11 @@ def fetch_all_catalog_products():
                 except ValueError:
                     price_val = 0
 
-            # SI ESTÁ AGOTADO O EL PRECIO ES 0/VACÍO -> POR ENCARGUE
-            if not is_in_stock or stock_status == "outofstock" or price_val <= 0:
+            # EVALUACIÓN EXACTA:
+            # - Si está en 'onbackorder' ("Se puede reservar") -> POR ENCARGUE
+            # - Si está en 'outofstock' ("Agotado") o 'is_in_stock' es False -> POR ENCARGUE
+            # - Si el precio es <= 0 -> POR ENCARGUE
+            if stock_status in ["onbackorder", "outofstock"] or not is_in_stock or price_val <= 0:
                 is_on_demand = True
                 formatted_price = "POR ENCARGUE"
             else:
