@@ -148,9 +148,9 @@ def draw_vertical_gradient(draw_obj, rect, color_top, color_bottom):
 def create_story_template(product, img_obj):
     canvas_w, canvas_h = 1080, 1920
     
-    if product["is_on_demand"]:
+if product["is_on_demand"]:
         accent_color = ON_DEMAND_COLOR
-        display_label = "📦 PRODUCTO POR ENCARGUE"
+        display_label = ">> PRODUCTO POR ENCARGUE <<"
     else:
         accent_color = random.choice(ACCENT_COLORS)
         display_label = product["price"]
