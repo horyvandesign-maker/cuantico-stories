@@ -25,14 +25,13 @@ HISTORY_FILE = "published_history.json"
 
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN) if TELEGRAM_BOT_TOKEN else None
 
-# PALETA CYBERPUNK EXPANDIDA (Múltiples colores Neón aleatorios)
-CYBER_PALETTE = ["#00FF88", "#00E5FF", "#B000FF", "#FF0055", "#FF5722", "#00FFFF", "#76FF03"]
+ACCENT_COLORS = ["#00FF88", "#00E5FF", "#B000FF"]
 ON_DEMAND_COLOR = "#FFB703"
 
 user_choice = {"action": None}
 
 # ==========================================
-# HISTORIAL
+# HISTORIAL (Evita publicar repetidos)
 # ==========================================
 def load_history():
     if os.path.exists(HISTORY_FILE):
@@ -47,11 +46,12 @@ def save_to_history(product_id):
     history = load_history()
     if product_id not in history:
         history.append(product_id)
+        # Guardar solo los últimos 200 productos
         with open(HISTORY_FILE, "w") as f:
             json.dump(history[-200:], f)
 
 # ==========================================
-# BOT LISTENERS
+# BOT LISTENERS (Botones de Telegram)
 # ==========================================
 @bot.callback_query_handler(func=lambda call: True)
 def global_callback_listener(call):
@@ -87,49 +87,28 @@ def clean_text(text):
     return decoded.replace('"', "'").replace("”", "'").strip()
 
 def hex_to_rgb(hex_str):
+    """Convierte un string hexadecimal a tupla RGB"""
     hex_str = hex_str.lstrip('#')
     return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
 
+def draw_vertical_gradient(draw_obj, rect, color_top, color_bottom):
+    x1, y1, x2, y2 = rect
+    height = y2 - y1
+    for i in range(height):
+        ratio = i / float(height)
+        r = int(color_top[0] * (1 - ratio) + color_bottom[0] * ratio)
+        g = int(color_top[1] * (1 - ratio) + color_bottom[1] * ratio)
+        b = int(color_top[2] * (1 - ratio) + color_bottom[2] * ratio)
+        a = int(color_top[3] * (1 - ratio) + color_bottom[3] * ratio)
+        draw_obj.line([(x1, y1 + i), (x2, y1 + i)], fill=(r, g, b, a))
+
 def draw_neon_glow_line(draw_obj, points, color_rgb, width=6, glow_intensity=4):
+    """Dibuja líneas neón con mayor grosor y presencia visual"""
     for i in range(glow_intensity, 0, -1):
         alpha = int(255 / (i * 1.5))
         w = width + (i * 6)
         draw_obj.line(points, fill=(color_rgb[0], color_rgb[1], color_rgb[2], alpha), width=w)
     draw_obj.line(points, fill=(255, 255, 255, 240), width=width)
-
-def draw_random_cyber_lines(t_draw, canvas_w, canvas_h):
-    """Genera líneas y HUDs neón completamente aleatorios y multicolores en cada ejecución"""
-    for _ in range(4): # Cantidad de formaciones aleatorias
-        color_hex = random.choice(CYBER_PALETTE)
-        accent_rgb = hex_to_rgb(color_hex)
-        
-        # Posición aleatoria en esquinas o laterales
-        quadrant = random.choice(["top_left", "top_right", "bottom_left", "bottom_right"])
-        
-        if quadrant == "top_left":
-            x = random.randint(0, 80)
-            y = random.randint(180, 280)
-            points = [(x, y), (x + random.randint(120, 240), y), (x + random.randint(220, 340), y + random.randint(70, 130))]
-        elif quadrant == "top_right":
-            x = random.randint(canvas_w - 80, canvas_w)
-            y = random.randint(180, 280)
-            points = [(x, y), (x - random.randint(120, 240), y), (x - random.randint(220, 340), y + random.randint(70, 130))]
-        elif quadrant == "bottom_left":
-            x = random.randint(0, 80)
-            y = random.randint(canvas_h - 380, canvas_h - 260)
-            points = [(x, y), (x + random.randint(120, 240), y), (x + random.randint(220, 340), y - random.randint(70, 130))]
-        else:
-            x = random.randint(canvas_w - 80, canvas_w)
-            y = random.randint(canvas_h - 380, canvas_h - 260)
-            points = [(x, y), (x - random.randint(120, 240), y), (x - random.randint(220, 340), y - random.randint(70, 130))]
-            
-        w_val = random.randint(4, 7)
-        glow_val = random.randint(3, 5)
-        draw_neon_glow_line(t_draw, points, accent_rgb, width=w_val, glow_intensity=glow_val)
-        
-        # Nodo o punto tecnológico en el vértice final
-        end_pt = points[-1]
-        t_draw.ellipse((end_pt[0]-6, end_pt[1]-6, end_pt[0]+6, end_pt[1]+6), fill=(255, 255, 255, 255), outline=accent_rgb, width=2)
 
 # ==========================================
 # INTELIGENCIA ARTIFICIAL (Gemini)
@@ -141,6 +120,7 @@ def generate_ai_title(original_title, permalink=""):
         client = genai.Client(api_key=GEMINI_API_KEY)
         prompt = (
             f"Analizá este producto de tecnología: '{original_title}'. "
+            f"Identificá si es Gamer, Productividad/Oficina o Conectividad/Redes. "
             f"Crea un título comercial directo e irresistible para una Instagram Story. "
             f"REGLAS: Máximo 6 palabras, sin emojis, sin comillas, en español latino."
         )
@@ -155,7 +135,7 @@ def generate_ai_title(original_title, permalink=""):
         return original_title
 
 # ==========================================
-# WOOCOMMERCE CATALOG FETCH
+# EXTRACCIÓN DE PRODUCTOS WOOCOMMERCE
 # ==========================================
 def fetch_all_catalog_products():
     endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
@@ -181,6 +161,8 @@ def fetch_all_catalog_products():
             
         for product in items:
             prod_id = product.get("id")
+            
+            # FILTRO: Saltear si ya fue publicado
             if prod_id in history:
                 continue
 
@@ -225,38 +207,56 @@ def fetch_all_catalog_products():
     return catalog
 
 # ==========================================
-# MOTOR GRÁFICO (Plantilla con Líneas Aleatorias y Multicolor)
+# MOTOR GRÁFICO (Plantilla Neón / Cyberpunk)
 # ==========================================
 def create_story_template(product, img_obj):
     canvas_w, canvas_h = 1080, 1920
     
+    # 1. Definición de colores
     if product["is_on_demand"]:
-        accent_hex = ON_DEMAND_COLOR
+        accent_hex = ON_DEMAND_COLOR  # #FFB703
         display_label = ">> PRODUCTO POR ENCARGUE <<"
         cta_text = "Respondé 'QUIERO' por DM o tocá el enlace"
     else:
-        accent_hex = random.choice(CYBER_PALETTE)
+        accent_hex = random.choice(ACCENT_COLORS)
         display_label = product["price"]
         cta_text = "Tocá la tarjeta para ver en la tienda"
         
     accent_rgb = hex_to_rgb(accent_hex)
     
-    # Fondo Oscuro
+    # 2. Fondo OSCURO TECH con gradiente y blur
     bg = img_obj.resize((canvas_w, canvas_h)).filter(ImageFilter.GaussianBlur(80))
     overlay = Image.new("RGBA", (canvas_w, canvas_h), (8, 9, 14, 215))
     bg.paste(overlay, (0, 0), overlay)
     
-    # Capa de vectores Neón aleatorios y multicolores
+    # Capa de líneas vectores Neón
     tech_layer = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     t_draw = ImageDraw.Draw(tech_layer)
-    draw_random_cyber_lines(t_draw, canvas_w, canvas_h)
+    
+    # 3. LÍNEAS NEÓN REFORZADAS
+    # Esquina Superior Izquierda
+    draw_neon_glow_line(t_draw, [(0, 200), (250, 200), (350, 300)], accent_rgb, width=6, glow_intensity=4)
+    t_draw.line([(0, 220), (230, 220)], fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 160), width=2)
+    
+    # Esquina Superior Derecha
+    draw_neon_glow_line(t_draw, [(canvas_w, 240), (canvas_w - 200, 240), (canvas_w - 320, 360)], accent_rgb, width=6, glow_intensity=4)
+    
+    # Esquinas Inferiores
+    draw_neon_glow_line(t_draw, [(0, canvas_h - 350), (180, canvas_h - 350), (280, canvas_h - 250)], accent_rgb, width=6, glow_intensity=4)
+    draw_neon_glow_line(t_draw, [(canvas_w, canvas_h - 300), (canvas_w - 220, canvas_h - 300)], accent_rgb, width=3)
+    
+    # Nodos iluminados
+    t_draw.ellipse((350 - 7, 300 - 7, 350 + 7, 300 + 7), fill=(255, 255, 255, 255), outline=accent_rgb, width=3)
+    t_draw.ellipse((canvas_w - 320 - 7, 360 - 7, canvas_w - 320 + 7, 360 + 7), fill=(255, 255, 255, 255), outline=accent_rgb, width=3)
+
     bg.paste(tech_layer, (0, 0), tech_layer)
 
-    # Tarjeta Central y Glow
+    # 4. TARJETA CENTRAL Y GLOW AMBIENTAL
     card_w, card_h = 860, 860
     card_x = (canvas_w - card_w) // 2
     card_y = 410
     
+    # Halo de Luz ambiental detrás
     glow_bg = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     g_draw = ImageDraw.Draw(glow_bg)
     g_draw.ellipse((card_x + 80, card_y + 80, card_x + card_w - 80, card_y + card_h - 80), 
@@ -264,6 +264,7 @@ def create_story_template(product, img_obj):
     glow_bg = glow_bg.filter(ImageFilter.GaussianBlur(65))
     bg.paste(glow_bg, (0, 0), glow_bg)
     
+    # Marco Neón exterior a la tarjeta
     card_border = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     cb_draw = ImageDraw.Draw(card_border)
     cb_draw.rounded_rectangle((card_x - 6, card_y - 6, card_x + card_w + 6, card_y + card_h + 6), 
@@ -271,13 +272,14 @@ def create_story_template(product, img_obj):
     card_border = card_border.filter(ImageFilter.GaussianBlur(5))
     bg.paste(card_border, (0, 0), card_border)
 
+    # Tarjeta Blanca Central
     card_bg = Image.new("RGBA", (card_w, card_h), (255, 255, 255, 248))
     card_mask = Image.new("L", (card_w, card_h), 0)
     card_mask_draw = ImageDraw.Draw(card_mask)
     card_mask_draw.rounded_rectangle((0, 0, card_w, card_h), radius=30, fill=255)
     bg.paste(card_bg, (card_x, card_y), card_mask)
 
-    # Producto
+    # 5. PRODUCTO
     img_copy = img_obj.copy()
     img_copy.thumbnail((760, 760))
     p_w, p_h = img_copy.size
@@ -287,7 +289,7 @@ def create_story_template(product, img_obj):
 
     draw = ImageDraw.Draw(bg)
 
-    # Logotipo
+    # 6. LOGOTIPO (Zona segura superior)
     logo_path = os.path.join(os.path.dirname(__file__), "logo_canva.png")
     if os.path.exists(logo_path):
         try:
@@ -301,7 +303,7 @@ def create_story_template(product, img_obj):
     else:
         draw.text((canvas_w // 2, 180), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
 
-    # Título
+    # 7. TÍTULO ENMARCADO TECH
     font_title = get_font(42)
     wrapped_lines = textwrap.wrap(product["ai_name"], width=22)
     wrapped_text = "\n".join(wrapped_lines[:2])
@@ -309,7 +311,7 @@ def create_story_template(product, img_obj):
     title_y = card_y + card_h + 80
     draw.multiline_text((canvas_w // 2, title_y), wrapped_text, fill="#FFFFFF", font=font_title, anchor="mm", align="center")
 
-    # Badge de Precio / Encargue
+    # 8. BADGE FUTURISTA
     font_size = 36 if product["is_on_demand"] else 54
     font_badge = get_font(font_size)
     
@@ -324,11 +326,12 @@ def create_story_template(product, img_obj):
     badge_x2 = badge_x1 + badge_w
     badge_y2 = badge_y1 + badge_h
 
+    # Fondo Badge oscuro con resplandor neón
     draw.rounded_rectangle((badge_x1 - 2, badge_y1 - 2, badge_x2 + 2, badge_y2 + 2), radius=22, fill=accent_rgb)
     draw.rounded_rectangle((badge_x1, badge_y1, badge_x2, badge_y2), radius=20, fill=(12, 14, 20, 255))
     draw.text(((badge_x1 + badge_x2) // 2, (badge_y1 + badge_y2) // 2 - 2), display_label, fill=accent_hex, font=font_badge, anchor="mm")
 
-    # Banner CTA inferior
+    # 9. BANNER FOOTER ESTILO CYBER (Zona segura inferior)
     cta_box_w, cta_box_h = 960, 80
     cta_x1 = (canvas_w - cta_box_w) // 2
     cta_y1 = canvas_h - 220
@@ -345,7 +348,7 @@ def create_story_template(product, img_obj):
     return output_path
 
 # ==========================================
-# PUBLICACIÓN WEB / INSTAGRAM (Con diagnóstico de Link Sticker)
+# PUBLICACIÓN WEB / INSTAGRAM
 # ==========================================
 def upload_local_image_to_web(local_filepath):
     url = "https://freeimage.host/api/1/upload"
@@ -379,13 +382,12 @@ def publish_to_instagram(local_image_path, product_link):
 
     container_url = f"https://graph.facebook.com/v26.0/{IG_USER_ID}/media"
     
-    # Configuración del sticker de enlace nativo de Instagram
     link_sticker = {
         "link_material_option": 0,
         "url": product_link,
         "x": 0.5,
-        "y": 0.5,
-        "width": 0.5,
+        "y": 0.9,
+        "width": 0.6,
         "height": 0.1,
         "rotation": 0.0
     }
@@ -400,9 +402,7 @@ def publish_to_instagram(local_image_path, product_link):
     res = requests.post(container_url, data=payload)
     res_data = res.json()
     
-    # Si la API rechaza el sticker de enlace, imprimimos el error exacto en consola para diagnosticar
     if "id" not in res_data:
-        print(f"⚠️ Meta rechazó el sticker de enlace (Story se publicará sin enlace): {res_data}")
         payload.pop("story_sticker_ids", None)
         res = requests.post(container_url, data=payload)
         res_data = res.json()
@@ -466,6 +466,7 @@ def process_catalog(auto_approve=False):
             
             type_str = "📦 POR ENCARGUE" if prod["is_on_demand"] else f"💰 {prod['price']}"
             
+            # TEXTO EN FORMATO HTML PARA EVITAR ERRORES DE MARKDOWN CON NOMBRES RAROS
             caption = (
                 f"📦 <b>[{index}/{total}] {html.escape(prod['original_name'])}</b>\n"
                 f"Estado asignado: <b>{type_str}</b>\n"
