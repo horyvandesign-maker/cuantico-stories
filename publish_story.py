@@ -113,13 +113,13 @@ def fetch_all_catalog_products():
                 except ValueError:
                     price_val = 0
 
-            if not is_in_stock or stock_status != "instock" or price_val <= 0:
-                is_on_demand = True
-                formatted_price = "POR ENCARGUE"
-            else:
-                is_on_demand = False
-                val_final = price_val / 100
-                formatted_price = f"${val_final:,.0f}".replace(",", ".")
+if price_val > 0:
+    is_on_demand = False
+    val_final = price_val / 100
+    formatted_price = f"${val_final:,.0f}".replace(",", ".")
+else:
+    is_on_demand = True
+    formatted_price = "POR ENCARGUE"
 
             catalog.append({
                 "id": product.get("id"),
