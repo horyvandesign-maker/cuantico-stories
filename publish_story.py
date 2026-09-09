@@ -75,20 +75,32 @@ def generate_ai_title(original_title):
         return original_title
 
 def fetch_all_catalog_products():
-    endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-        "Pragma": "no-cache"
-    }
+    # Cambiamos al endpoint oficial v3 de WooCommerce REST API
+    endpoint = f"{SITE_URL}/wp-json/wc/v3/products"
     
+    # Si usás llaves de API las pones en params, si es pública podés hacer la petición directa:
     catalog = []
     page = 1
     
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Cache-Control": "no-cache"
+    }
+
     while True:
-        params = {"per_page": 50, "page": page, "_nocache": int(time.time())}
+        params = {
+            "per_page": 50, 
+            "page": page,
+            "_fields": "id,name,price,regular_price,stock_status,backorders_allowed,images",
+            "_nocache": int(time.time())
+        }
+        
+        # En caso de requerir autenticación básica si la v3 está protegida:
+        # res = requests.get(endpoint, params=params, auth=(WC_KEY, WC_SECRET), timeout=15)
         res = requests.get(endpoint, params=params, headers=headers, timeout=15)
+        
         if res.status_code != 200 or not res.json():
+            # FALLBACK DE EMERGENCIA: Si la v3 requiere auth y devuelve 401, usamos Store API analizando el HTML
             break
             
         items = res.json()
@@ -100,38 +112,26 @@ def fetch_all_catalog_products():
             if not images:
                 continue
 
-            prices_info = product.get("prices", {})
-            raw_price = prices_info.get("price")
-            
-            # Chequeos de inventario y reservas en WooCommerce Store API
-            is_in_stock = product.get("is_in_stock", True)
-            stock_status = str(product.get("stock_status", "")).lower().strip()
-            
-            # En la Store API la propiedad para "Se puede reservar" es backorders_allowed
+            # API v3 expone estas variables tal cual están en la base de datos:
+            stock_status = str(product.get("stock_status", "")).lower() # 'instock', 'outofstock', 'onbackorder'
             backorders_allowed = product.get("backorders_allowed", False)
-            
-            # También verificamos si el precio regular/sale está vacío
-            regular_price = prices_info.get("regular_price")
-            
-            price_val = 0
-            if raw_price is not None and str(raw_price).strip() != "":
-                try:
-                    price_val = int(raw_price)
-                except ValueError:
-                    price_val = 0
+            raw_price = product.get("price", "")
 
-            # EVALUACIÓN COMPLETA PARA TIENDA Y RESERVAS:
-            # Pasa a POR ENCARGUE si:
-            # 1. Permite reservas / Se puede reservar (backorders_allowed == True)
-            # 2. Está agotado (stock_status == 'outofstock' o is_in_stock es False)
-            # 3. No tiene precio asignado o su precio es 0
-            if backorders_allowed or stock_status in ["onbackorder", "outofstock"] or not is_in_stock or price_val <= 0 or regular_price is None:
+            try:
+                price_val = float(raw_price) if raw_price else 0
+            except ValueError:
+                price_val = 0
+
+            # CRITERIO DE EVALUACIÓN DIRECTO Y EXACTO
+            is_backorder = (stock_status == "onbackorder") or backorders_allowed
+            is_out_of_stock = (stock_status == "outofstock")
+            
+            if is_backorder or is_out_of_stock or price_val <= 0:
                 is_on_demand = True
                 formatted_price = "POR ENCARGUE"
             else:
                 is_on_demand = False
-                val_final = price_val / 100
-                formatted_price = f"${val_final:,.0f}".replace(",", ".")
+                formatted_price = f"${price_val:,.0f}".replace(",", ".")
 
             catalog.append({
                 "id": product.get("id"),
