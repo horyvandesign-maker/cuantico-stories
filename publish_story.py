@@ -105,7 +105,7 @@ def fetch_all_catalog_products():
             
             # Chequeos de stock propios de la Store API
             is_in_stock = product.get("is_in_stock", True)
-            stock_status = str(product.get("stock_status", "")).lower()
+            is_on_backorder = product.get("is_on_backorder", False)
             
             # Verificar disponibilidad real
             is_purchasable = product.get("is_purchasable", True)
