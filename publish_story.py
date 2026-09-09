@@ -75,32 +75,20 @@ def generate_ai_title(original_title):
         return original_title
 
 def fetch_all_catalog_products():
-    # Cambiamos al endpoint oficial v3 de WooCommerce REST API
-    endpoint = f"{SITE_URL}/wp-json/wc/v3/products"
+    endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache"
+    }
     
-    # Si usás llaves de API las pones en params, si es pública podés hacer la petición directa:
     catalog = []
     page = 1
     
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Cache-Control": "no-cache"
-    }
-
     while True:
-        params = {
-            "per_page": 50, 
-            "page": page,
-            "_fields": "id,name,price,regular_price,stock_status,backorders_allowed,images",
-            "_nocache": int(time.time())
-        }
-        
-        # En caso de requerir autenticación básica si la v3 está protegida:
-        # res = requests.get(endpoint, params=params, auth=(WC_KEY, WC_SECRET), timeout=15)
+        params = {"per_page": 50, "page": page, "_nocache": int(time.time())}
         res = requests.get(endpoint, params=params, headers=headers, timeout=15)
-        
         if res.status_code != 200 or not res.json():
-            # FALLBACK DE EMERGENCIA: Si la v3 requiere auth y devuelve 401, usamos Store API analizando el HTML
             break
             
         items = res.json()
@@ -112,26 +100,32 @@ def fetch_all_catalog_products():
             if not images:
                 continue
 
-            # API v3 expone estas variables tal cual están en la base de datos:
-            stock_status = str(product.get("stock_status", "")).lower() # 'instock', 'outofstock', 'onbackorder'
-            backorders_allowed = product.get("backorders_allowed", False)
-            raw_price = product.get("price", "")
-
-            try:
-                price_val = float(raw_price) if raw_price else 0
-            except ValueError:
-                price_val = 0
-
-            # CRITERIO DE EVALUACIÓN DIRECTO Y EXACTO
-            is_backorder = (stock_status == "onbackorder") or backorders_allowed
-            is_out_of_stock = (stock_status == "outofstock")
+            prices_info = product.get("prices", {})
+            raw_price = prices_info.get("price")
             
-            if is_backorder or is_out_of_stock or price_val <= 0:
+            # Chequeos de stock propios de la Store API
+            is_in_stock = product.get("is_in_stock", True)
+            stock_status = str(product.get("stock_status", "")).lower()
+            
+            # Verificar disponibilidad real
+            is_purchasable = product.get("is_purchasable", True)
+            has_options = product.get("has_options", False)
+
+            price_val = 0
+            if raw_price is not None and str(raw_price).strip() != "":
+                try:
+                    price_val = int(raw_price)
+                except ValueError:
+                    price_val = 0
+
+            # SI NO ESTÁ EN STOCK, NO ES COMPRABLE O SU PRECIO ES 0 -> POR ENCARGUE
+            if not is_in_stock or stock_status in ["outofstock", "onbackorder"] or not is_purchasable or price_val <= 0:
                 is_on_demand = True
                 formatted_price = "POR ENCARGUE"
             else:
                 is_on_demand = False
-                formatted_price = f"${price_val:,.0f}".replace(",", ".")
+                val_final = price_val / 100
+                formatted_price = f"${val_final:,.0f}".replace(",", ".")
 
             catalog.append({
                 "id": product.get("id"),
