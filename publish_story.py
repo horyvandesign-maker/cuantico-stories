@@ -148,7 +148,7 @@ def draw_vertical_gradient(draw_obj, rect, color_top, color_bottom):
 def create_story_template(product, img_obj):
     canvas_w, canvas_h = 1080, 1920
     
-if product["is_on_demand"]:
+    if product["is_on_demand"]:
         accent_color = ON_DEMAND_COLOR
         display_label = ">> PRODUCTO POR ENCARGUE <<"
     else:
@@ -240,7 +240,7 @@ if product["is_on_demand"]:
     output_path = f"story_{product['id']}.jpg"
     bg.save(output_path, "JPEG", quality=95)
     return output_path
-
+    
 def upload_local_image_to_web(local_filepath):
     """
     Sube la imagen armada a una pasarela alternativa ultra estable (FreeImage.host)
