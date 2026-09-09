@@ -103,11 +103,16 @@ def fetch_all_catalog_products():
             prices_info = product.get("prices", {})
             raw_price = prices_info.get("price")
             
-            # Capturamos el estado de inventario exacto de WooCommerce
-            stock_status = str(product.get("stock_status", "")).lower().strip()
+            # Chequeos de inventario y reservas en WooCommerce Store API
             is_in_stock = product.get("is_in_stock", True)
-
-            # Convertir precio a valor numérico entero
+            stock_status = str(product.get("stock_status", "")).lower().strip()
+            
+            # En la Store API la propiedad para "Se puede reservar" es backorders_allowed
+            backorders_allowed = product.get("backorders_allowed", False)
+            
+            # También verificamos si el precio regular/sale está vacío
+            regular_price = prices_info.get("regular_price")
+            
             price_val = 0
             if raw_price is not None and str(raw_price).strip() != "":
                 try:
@@ -115,11 +120,12 @@ def fetch_all_catalog_products():
                 except ValueError:
                     price_val = 0
 
-            # EVALUACIÓN EXACTA:
-            # - Si está en 'onbackorder' ("Se puede reservar") -> POR ENCARGUE
-            # - Si está en 'outofstock' ("Agotado") o 'is_in_stock' es False -> POR ENCARGUE
-            # - Si el precio es <= 0 -> POR ENCARGUE
-            if stock_status in ["onbackorder", "outofstock"] or not is_in_stock or price_val <= 0:
+            # EVALUACIÓN COMPLETA PARA TIENDA Y RESERVAS:
+            # Pasa a POR ENCARGUE si:
+            # 1. Permite reservas / Se puede reservar (backorders_allowed == True)
+            # 2. Está agotado (stock_status == 'outofstock' o is_in_stock es False)
+            # 3. No tiene precio asignado o su precio es 0
+            if backorders_allowed or stock_status in ["onbackorder", "outofstock"] or not is_in_stock or price_val <= 0 or regular_price is None:
                 is_on_demand = True
                 formatted_price = "POR ENCARGUE"
             else:
