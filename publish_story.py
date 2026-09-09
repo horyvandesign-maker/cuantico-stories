@@ -15,7 +15,6 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 IG_USER_ID = os.environ.get("IG_USER_ID")
 ACCESS_TOKEN = os.environ.get("INSTAGRAM_ACCESS_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-IMGBB_API_KEY = os.environ.get("IMGBB_API_KEY")  # Opcional: Clave gratuita de ImgBB para subir la plantilla
 
 SITE_URL = "https://cuanticopc.com.ar"
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN) if TELEGRAM_BOT_TOKEN else None
@@ -244,38 +243,40 @@ def create_story_template(product, img_obj):
 
 def upload_local_image_to_web(local_filepath):
     """
-    Sube la imagen armada localmente a un servicio de hosting temporal público (ImgBB)
-    para que la API de Meta pueda descargarla con una URL válida.
+    Sube la imagen armada a una pasarela alternativa ultra estable (FreeImage.host)
     """
-    if IMGBB_API_KEY:
-        try:
-            with open(local_filepath, "rb") as file:
-                res = requests.post("https://api.imgbb.com/1/upload", data={"key": IMGBB_API_KEY}, files={"image": file})
-                data = res.json()
-                if data.get("success"):
-                    return data["data"]["url"]
-        except Exception as e:
-            print(f"Error subiendo a ImgBB: {e}")
-
-    # Fallback alternativo gratuito sin API Key (Catbox / free host)
+    url = "https://freeimage.host/api/1/upload"
     try:
         with open(local_filepath, "rb") as file:
-            res = requests.post("https://catbox.moe/user/api.php", data={"reqtype": "fileupload"}, files={"fileToUpload": file})
-            if res.status_code == 200 and res.text.startswith("http"):
-                return res.text.strip()
+            payload = {"key": "6d207e02198a847aa98d0a2a901485a5", "action": "upload", "format": "json"}
+            files = {"source": file}
+            res = requests.post(url, data=payload, files=files, timeout=20)
+            data = res.json()
+            if res.status_code == 200 and "image" in data and "url" in data["image"]:
+                return data["image"]["url"]
     except Exception as e:
-        print(f"Error subiendo a hosting temporal: {e}")
+        print(f"Error en servidor principal de imágenes: {e}")
+
+    # Fallback 2: Subida por transferencia
+    try:
+        with open(local_filepath, "rb") as file:
+            res = requests.post("https://tmpfiles.org/api/v1/upload", files={"file": file}, timeout=15)
+            data = res.json()
+            if "data" in data and "url" in data["data"]:
+                # Convertir URL de vista previa a URL directa de imagen
+                direct_url = data["data"]["url"].replace("tmpfiles.org/", "tmpfiles.org/dl/")
+                return direct_url
+    except Exception as e:
+        print(f"Error en servidor secundario de imágenes: {e}")
 
     return None
 
 def publish_to_instagram(local_image_path):
-    # 1. Subimos la plantilla JPG armada localmente para tener una URL accesible por Meta
     public_image_url = upload_local_image_to_web(local_image_path)
     
     if not public_image_url:
         return False, "No se pudo obtener una URL pública para la plantilla armada."
 
-    # 2. Enviamos la URL de la plantilla procesada a la API Graph
     container_url = f"https://graph.facebook.com/v26.0/{IG_USER_ID}/media"
     payload = {"image_url": public_image_url, "media_type": "STORIES", "access_token": ACCESS_TOKEN}
     
@@ -339,7 +340,6 @@ def process_catalog():
             bot.polling(timeout=300, non_stop=False)
             
             if user_choice["action"] == "approve":
-                # AQUÍ SE PASA LA PLANTILLA LOCAL `image_path` EN LUGAR DE LA FOTO CRUDA DE WOOCOMMERCE
                 success, result = publish_to_instagram(image_path)
                 if success:
                     bot.send_message(TELEGRAM_CHAT_ID, "🎉 ¡Publicado con éxito el diseño final en Instagram Stories!", parse_mode="Markdown")
