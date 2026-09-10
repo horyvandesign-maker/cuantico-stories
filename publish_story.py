@@ -840,41 +840,24 @@ def generate_ai_title(
 def fetch_all_catalog_products():
     from datetime import datetime
 
-    endpoint = (
-        f"{SITE_URL}/wp-json/"
-        "wc/store/v1/products"
-    )
-
+    endpoint = f"{SITE_URL}/wp-json/wc/store/v1/products"
     headers = {
-        "User-Agent": (
-            "Mozilla/5.0 "
-            "(Windows NT 10.0; Win64; x64)"
-        ),
-        "Cache-Control": (
-            "no-cache, no-store, must-revalidate"
-        ),
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
         "Pragma": "no-cache",
     }
 
     catalog = []
     page = 1
 
-    # Traemos todos los productos del catálogo web
     while True:
-
         params = {
             "per_page": 50,
             "page": page,
             "_nocache": int(time.time()),
         }
-
         try:
-            response = requests.get(
-                endpoint,
-                params=params,
-                headers=headers,
-                timeout=20,
-            )
+            response = requests.get(endpoint, params=params, headers=headers, timeout=20)
         except requests.RequestException as error:
             print(f"Error WooCommerce: {error}")
             break
@@ -913,12 +896,7 @@ def fetch_all_catalog_products():
                 except (ValueError, TypeError):
                     price_val = 0
 
-            if (
-                not is_in_stock
-                or is_on_backorder
-                or not is_purchasable
-                or price_val <= 0
-            ):
+            if not is_in_stock or is_on_backorder or not is_purchasable or price_val <= 0:
                 is_on_demand = True
                 formatted_price = "POR ENCARGUE"
             else:
@@ -926,33 +904,25 @@ def fetch_all_catalog_products():
                 val_final = price_val / 100
                 formatted_price = f"${val_final:,.0f}".replace(",", ".")
 
-            catalog.append(
-                {
-                    "id": product.get("id"),
-                    "original_name": clean_text(
-                        product.get("name", "Producto Cuantico")
-                    ),
-                    "price": formatted_price,
-                    "is_on_demand": is_on_demand,
-                    "raw_url": raw_image_url,
-                    "permalink": product.get("permalink", SITE_URL),
-                }
-            )
+            catalog.append({
+                "id": product.get("id"),
+                "original_name": clean_text(product.get("name", "Producto Cuantico")),
+                "price": formatted_price,
+                "is_on_demand": is_on_demand,
+                "raw_url": raw_image_url,
+                "permalink": product.get("permalink", SITE_URL),
+            })
 
         page += 1
 
     if not catalog:
         return []
 
-    # APLICAMOS ROTACIÓN: Seleccionamos un único producto según la fecha y hora actual
     now = datetime.now()
-    # Rota el índice cada 12 horas (mañana / tarde) asegurando ciclo continuo
     run_index = (now.toordinal() * 2 + (0 if now.hour < 14 else 1)) % len(catalog)
     selected_product = catalog[run_index]
 
     print(f"Producto seleccionado por rotación: {selected_product['original_name']}")
-    
-    # Devolvemos una lista con un solo elemento para mantener la estructura del bucle principal
     return [selected_product]
 
 # ============================================================
