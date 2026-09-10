@@ -2023,7 +2023,7 @@ def process_catalog(
                 )
             )
 
-            # ------------------------------------------------
+# ------------------------------------------------
             # AUTO APPROVE
             # ------------------------------------------------
 
@@ -2047,6 +2047,32 @@ def process_catalog(
                         "Publicado automáticamente."
                     )
 
+                    # Notificación de éxito por Telegram
+                    if bot and TELEGRAM_CHAT_ID:
+                        try:
+                            escaped_name = html.escape(product["original_name"])
+                            escaped_ai_name = html.escape(product.get("ai_name", product["original_name"]))
+                            escaped_permalink = html.escape(product["permalink"], quote=True)
+                            
+                            type_str = "📦 POR ENCARGUE" if product["is_on_demand"] else f"💰 {product['price']}"
+
+                            caption = (
+                                "🎉 <b>¡Story publicada automáticamente con éxito!</b>\n\n"
+                                f"📦 <b>{escaped_name}</b>\n"
+                                f"🤖 Título Story: <b>{escaped_ai_name}</b>\n"
+                                f"Estado: <b>{type_str}</b>\n\n"
+                                f"🔗 <a href=\"{escaped_permalink}\">Ver producto en tienda</a>"
+                            )
+
+                            bot.send_message(
+                                TELEGRAM_CHAT_ID,
+                                caption,
+                                parse_mode="HTML",
+                                disable_web_page_preview=False,
+                            )
+                        except Exception as err:
+                            print(f"Error enviando notificación a Telegram: {err}")
+
                 else:
 
                     print(
@@ -2054,6 +2080,21 @@ def process_catalog(
                         "Error Instagram: "
                         f"{result}"
                     )
+
+                    # Notificación de error por Telegram
+                    if bot and TELEGRAM_CHAT_ID:
+                        try:
+                            safe_error = html.escape(str(result))
+                            bot.send_message(
+                                TELEGRAM_CHAT_ID,
+                                (
+                                    "❌ <b>Error en publicación automática de Instagram:</b>\n"
+                                    f"<code>{safe_error}</code>"
+                                ),
+                                parse_mode="HTML",
+                            )
+                        except Exception as err:
+                            print(f"Error enviando notificación de error a Telegram: {err}")
 
                 delete_local_file(
                     image_path
