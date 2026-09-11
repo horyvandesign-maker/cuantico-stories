@@ -639,7 +639,7 @@ def create_story_template(product, img_obj):
         (card_x - 5, card_y - 5, card_x + card_w + 5, card_y + card_h + 5),
         radius=35,
         outline=accent_hex,
-        width=6,
+        width=16, # <--- Modificá este valor
     )
 
     # Fondo Blanco Interno
@@ -705,13 +705,17 @@ def create_story_template(product, img_obj):
     badge_glow = badge_glow.filter(ImageFilter.GaussianBlur(16))
     bg.alpha_composite(badge_glow)
 
+    # --------------------------------------------------------
+    # Borde del Badge de Precio / Encargue:
+    # --------------------------------------------------------
+    
     draw = ImageDraw.Draw(bg)
     draw.rounded_rectangle(
         (badge_x1, badge_y1, badge_x2, badge_y2),
         radius=20,
         fill=(10, 12, 18, 240),
         outline=accent_hex,
-        width=6,
+        width=10, # <--- Modificá este valor
     )
     draw.text(((badge_x1 + badge_x2) // 2, (badge_y1 + badge_y2) // 2 - 2), display_label, fill=accent_hex, font=font_badge, anchor="mm")
 
@@ -745,14 +749,17 @@ def create_story_template(product, img_obj):
     cta_glow = cta_glow.filter(ImageFilter.GaussianBlur(18))
     bg.alpha_composite(cta_glow)
 
-    # Caja CTA (width=6)
+    # --------------------------------------------------------
+    # Borde de la Caja de CTA (Texto inferior):
+    # --------------------------------------------------------
+    
     draw = ImageDraw.Draw(bg)
     draw.rounded_rectangle(
         (cta_x1, cta_y1, cta_x2, cta_y2),
         radius=20,
         fill=(10, 12, 18, 245),
         outline=accent_hex,
-        width=6,
+        width=10, # <--- Modificá este valor
     )
 
     font_cta = get_font(30)
