@@ -639,7 +639,7 @@ def create_story_template(product, img_obj):
         (card_x - 5, card_y - 5, card_x + card_w + 5, card_y + card_h + 5),
         radius=35,
         outline=accent_hex,
-        width=6,
+        width=60,
     )
 
     # Fondo Blanco Interno
