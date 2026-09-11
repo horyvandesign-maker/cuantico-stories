@@ -238,6 +238,106 @@ def get_font(size):
     return ImageFont.load_default()
 
 
+FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
+
+
+def get_display_font(size):
+    """Fuente de impacto para el titulo (condensada, tipo afiche)."""
+    candidates = [
+        os.path.join(FONT_DIR, "BebasNeue-Bold.otf"),
+        "/usr/share/fonts/opentype/bebas-neue/BebasNeue-Bold.otf",
+        "/usr/share/fonts/truetype/bebas-neue/BebasNeue-Bold.ttf",
+    ]
+    for path in candidates:
+        try:
+            return ImageFont.truetype(path, size)
+        except Exception:
+            pass
+    return get_font(int(size * 0.8))
+
+
+def get_heading_font(size):
+    """Fuente para badges, CTA y textos de apoyo."""
+    candidates = [
+        os.path.join(FONT_DIR, "LeagueSpartan-Bold.otf"),
+        "/usr/share/fonts/opentype/league-spartan/LeagueSpartan-Bold.otf",
+        "/usr/share/fonts/truetype/league-spartan/LeagueSpartan-Bold.ttf",
+    ]
+    for path in candidates:
+        try:
+            return ImageFont.truetype(path, size)
+        except Exception:
+            pass
+    return get_font(size)
+
+
+def get_contrast_text_color(rgb):
+    luminance = (0.299 * rgb[0]) + (0.587 * rgb[1]) + (0.114 * rgb[2])
+    return "#0A0C12" if luminance > 150 else "#FFFFFF"
+
+
+def draw_sparkle(layer, x, y, color_rgb, size=20):
+    glow = Image.new("RGBA", layer.size, (0, 0, 0, 0))
+    glow_draw = ImageDraw.Draw(glow)
+    glow_draw.ellipse(
+        (x - size * 1.8, y - size * 1.8, x + size * 1.8, y + size * 1.8),
+        fill=(color_rgb[0], color_rgb[1], color_rgb[2], 100),
+    )
+    glow = glow.filter(ImageFilter.GaussianBlur(9))
+    layer.alpha_composite(glow)
+
+    draw = ImageDraw.Draw(layer)
+    points = [
+        (x, y - size), (x + size * 0.22, y - size * 0.22),
+        (x + size, y), (x + size * 0.22, y + size * 0.22),
+        (x, y + size), (x - size * 0.22, y + size * 0.22),
+        (x - size, y), (x - size * 0.22, y - size * 0.22),
+    ]
+    draw.polygon(points, fill=(255, 255, 255, 235))
+
+    small = size * 0.4
+    sx, sy = x + size * 1.35, y - size * 0.9
+    small_points = [
+        (sx, sy - small), (sx + small * 0.22, sy - small * 0.22),
+        (sx + small, sy), (sx + small * 0.22, sy + small * 0.22),
+        (sx, sy + small), (sx - small * 0.22, sy + small * 0.22),
+        (sx - small, sy), (sx - small * 0.22, sy - small * 0.22),
+    ]
+    draw.polygon(small_points, fill=(color_rgb[0], color_rgb[1], color_rgb[2], 220))
+
+
+def draw_chat_icon(layer, cx, cy, color_rgb, radius=24):
+    draw = ImageDraw.Draw(layer)
+    bubble_w = radius * 2.2
+    bubble_h = radius * 1.7
+    x1 = cx - bubble_w / 2
+    y1 = cy - bubble_h / 2 - 4
+    x2 = cx + bubble_w / 2
+    y2 = cy + bubble_h / 2 - 4
+
+    draw.rounded_rectangle(
+        (x1, y1, x2, y2), radius=10,
+        fill=(color_rgb[0], color_rgb[1], color_rgb[2], 255),
+    )
+    tail = [
+        (cx - bubble_w * 0.18, y2 - 1),
+        (cx - bubble_w * 0.18, y2 + 11),
+        (cx + bubble_w * 0.06, y2 - 1),
+    ]
+    draw.polygon(tail, fill=(color_rgb[0], color_rgb[1], color_rgb[2], 255))
+
+    dot_r = 2.8
+    spacing = 10
+    dot_cy = (y1 + y2) / 2
+    for i in range(-1, 2):
+        ddx = cx + i * spacing
+        draw.ellipse(
+            (ddx - dot_r, dot_cy - dot_r, ddx + dot_r, dot_cy + dot_r),
+            fill=(10, 12, 18, 255),
+        )
+
+
+
 def clean_text(text):
     if not text:
         return ""
@@ -564,7 +664,7 @@ def fetch_all_catalog_products():
 
 
 # ============================================================
-# CREACIÓN DE STORY (TÍTULO MAYÚSCULAS L/R, BORDES GRUESOS)
+# CREACIÓN DE STORY (TÍTULO ARRIBA, BORDES GRUESOS Y NEÓN POTENCIADO)
 # ============================================================
 
 def create_story_template(product, img_obj):
@@ -578,7 +678,6 @@ def create_story_template(product, img_obj):
 
     print(f"Story {product['id']} color={accent_hex} secundario={secondary_hex}")
 
-    # Fondo base con blur y oscuridad
     background_source = img_obj.convert("RGB").resize((canvas_w, canvas_h))
     background_source = background_source.filter(ImageFilter.GaussianBlur(random.randint(65, 95))).convert("RGBA")
 
@@ -591,7 +690,6 @@ def create_story_template(product, img_obj):
     background_source.alpha_composite(dark_overlay)
     bg = background_source
 
-    # Textura de Puntos de fondo
     texture_layer = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     tex_draw = ImageDraw.Draw(texture_layer)
     for x in range(0, canvas_w, 35):
@@ -599,7 +697,6 @@ def create_story_template(product, img_obj):
             tex_draw.ellipse((x, y, x + 2, y + 2), fill=(255, 255, 255, 55))
     bg.alpha_composite(texture_layer)
 
-    # Halo general atmosférico
     atmospheric_glow = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     glow_draw = ImageDraw.Draw(atmospheric_glow)
     glow_x, glow_y, glow_radius = random.randint(250, 830), random.randint(600, 1250), random.randint(350, 550)
@@ -610,152 +707,97 @@ def create_story_template(product, img_obj):
     atmospheric_glow = atmospheric_glow.filter(ImageFilter.GaussianBlur(130))
     bg.alpha_composite(atmospheric_glow)
 
-    # Decoración Tech
     tech_layer = create_random_tech_layer(canvas_w, canvas_h, accent_rgb, secondary_rgb)
     bg.alpha_composite(tech_layer)
 
     draw = ImageDraw.Draw(bg)
 
-    # --------------------------------------------------------
-    # ENCABEZADO: LOGO + TÍTULO MAYÚSCULAS (Distribución aleatoria izq/der)
-    # --------------------------------------------------------
     logo_path = os.path.join(os.path.dirname(__file__), "logo_canva.png")
+    logo_h_space = 140
     has_logo = False
-    logo_w, logo_h = 0, 0
-    logo_img = None
-
     if os.path.exists(logo_path):
         try:
             logo_img = Image.open(logo_path).convert("RGBA")
-            logo_img.thumbnail((300, 120), Image.Resampling.LANCZOS)
+            logo_img.thumbnail((450, 150), Image.Resampling.LANCZOS)
             logo_w, logo_h = logo_img.size
+            bg.paste(logo_img, ((canvas_w - logo_w) // 2, 90), logo_img)
+            logo_h_space = 90 + logo_h + 25
             has_logo = True
         except Exception as error:
             print(f"Error logo: {error}")
 
-    header_layout = random.choice(["logo_left", "logo_right"])
-    font_title = get_font(46)
+    if not has_logo:
+        draw.text((canvas_w // 2, 120), "CUANTICO PC", fill="#FFFFFF", font=get_heading_font(45), anchor="mm")
+        logo_h_space = 160
+
+    font_title = get_display_font(66)
     ai_name = product.get("ai_name", product["original_name"]).upper()
-    wrapped_lines = textwrap.wrap(ai_name, width=19)
-    wrapped_text = "\n".join(wrapped_lines[:2])
+    wrapped_lines = textwrap.wrap(ai_name, width=24)[:2]
+    wrapped_text = "\n".join(wrapped_lines)
+    title_y = logo_h_space + 25
+    line_height = 62
 
-    header_y_center = 145
-    line_spacing = 6
+    draw.multiline_text(
+        (canvas_w // 2 + 3, title_y + 3), wrapped_text, fill=(0, 0, 0, 230),
+        font=font_title, anchor="mm", align="center", spacing=6,
+    )
+    draw.multiline_text(
+        (canvas_w // 2, title_y), wrapped_text, fill="#FFFFFF",
+        font=font_title, anchor="mm", align="center", spacing=6,
+    )
 
-    # Calcular dimensiones del bloque multilínea para posicionarlo sin usar anchor
-    temp_img = Image.new("RGBA", (canvas_w, canvas_h))
-    temp_draw = ImageDraw.Draw(temp_img)
-    align_mode = "left" if has_logo else "center"
-    
-    bbox = temp_draw.multiline_textbbox((0, 0), wrapped_text, font=font_title, spacing=line_spacing, align=align_mode)
-    text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
-    text_y = header_y_center - (text_h // 2)
+    underline_y = title_y + ((len(wrapped_lines) * line_height) // 2) + 22
+    underline_half = 120
+    draw_neon_glow_line(
+        bg,
+        [(canvas_w // 2 - underline_half, underline_y), (canvas_w // 2 + underline_half, underline_y)],
+        accent_rgb, width=5, glow_intensity=3,
+    )
 
-    if has_logo:
-        if header_layout == "logo_left":
-            logo_x = 60
-            logo_y = header_y_center - (logo_h // 2)
-            bg.paste(logo_img, (logo_x, logo_y), logo_img)
-
-            text_x = logo_x + logo_w + 35
-            # Sombra y texto principal alineados a la izquierda
-            draw.multiline_text(
-                (text_x + 3, text_y + 3),
-                wrapped_text,
-                fill=(0, 0, 0, 220),
-                font=font_title,
-                align="left",
-                spacing=line_spacing,
-            )
-            draw.multiline_text(
-                (text_x, text_y),
-                wrapped_text,
-                fill="#FFFFFF",
-                font=font_title,
-                align="left",
-                spacing=line_spacing,
-            )
-        else:
-            logo_x = canvas_w - logo_w - 60
-            logo_y = header_y_center - (logo_h // 2)
-            bg.paste(logo_img, (logo_x, logo_y), logo_img)
-
-            text_x = 60
-            draw.multiline_text(
-                (text_x + 3, text_y + 3),
-                wrapped_text,
-                fill=(0, 0, 0, 220),
-                font=font_title,
-                align="left",
-                spacing=line_spacing,
-            )
-            draw.multiline_text(
-                (text_x, text_y),
-                wrapped_text,
-                fill="#FFFFFF",
-                font=font_title,
-                align="left",
-                spacing=line_spacing,
-            )
-    else:
-        text_x = (canvas_w - text_w) // 2
-        draw.multiline_text(
-            (text_x + 3, text_y + 3),
-            wrapped_text,
-            fill=(0, 0, 0, 220),
-            font=font_title,
-            align="center",
-            spacing=line_spacing,
-        )
-        draw.multiline_text(
-            (text_x, text_y),
-            wrapped_text,
-            fill="#FFFFFF",
-            font=font_title,
-            align="center",
-            spacing=line_spacing,
-        )
-
-    # --------------------------------------------------------
-    # TARJETA DEL PRODUCTO
-    # --------------------------------------------------------
-    card_w = 840
-    card_h = 840
+    card_w = 860
+    card_h = 860
     card_x = (canvas_w - card_w) // 2
-    card_y = 260
+    card_y = underline_y + 40
 
-    # Glow neón para la tarjeta
+    inner_glow = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+    ig_draw = ImageDraw.Draw(inner_glow)
+    ig_draw.ellipse(
+        (card_x + card_w * 0.08, card_y + card_h * 0.08, card_x + card_w * 0.92, card_y + card_h * 0.92),
+        fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 55),
+    )
+    inner_glow = inner_glow.filter(ImageFilter.GaussianBlur(95))
+    bg.alpha_composite(inner_glow)
+
+    glass_layer = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+    glass_draw = ImageDraw.Draw(glass_layer)
+    glass_draw.rounded_rectangle(
+        (card_x, card_y, card_x + card_w, card_y + card_h), radius=42, fill=(255, 255, 255, 12),
+    )
+    bg.alpha_composite(glass_layer)
+
     card_glow = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     cg_draw = ImageDraw.Draw(card_glow)
     cg_draw.rounded_rectangle(
         (card_x - 18, card_y - 18, card_x + card_w + 18, card_y + card_h + 18),
-        radius=45,
-        fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 180),
+        radius=48, fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 180),
     )
-    card_glow = card_glow.filter(ImageFilter.GaussianBlur(22))
+    card_glow = card_glow.filter(ImageFilter.GaussianBlur(24))
     bg.alpha_composite(card_glow)
 
     draw = ImageDraw.Draw(bg)
-
-    # Marco tarjeta con borde extra grueso (width=7)
     draw.rounded_rectangle(
-        (card_x - 5, card_y - 5, card_x + card_w + 5, card_y + card_h + 5),
-        radius=35,
-        outline=accent_hex,
-        width=7,
+        (card_x, card_y, card_x + card_w, card_y + card_h), radius=38, outline=accent_hex, width=6,
     )
 
-    # Fondo blanco interno
-    card_bg = Image.new("RGBA", (card_w, card_h), (255, 255, 255, 248))
-    card_mask = Image.new("L", (card_w, card_h), 0)
-    card_mask_draw = ImageDraw.Draw(card_mask)
-    card_mask_draw.rounded_rectangle((0, 0, card_w - 1, card_h - 1), radius=30, fill=255)
-    bg.paste(card_bg, (card_x, card_y), card_mask)
+    shadow_layer = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+    sh_draw = ImageDraw.Draw(shadow_layer)
+    sh_cx, sh_cy = card_x + card_w // 2, card_y + card_h - 90
+    sh_draw.ellipse((sh_cx - 260, sh_cy - 45, sh_cx + 260, sh_cy + 45), fill=(0, 0, 0, 150))
+    shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(35))
+    bg.alpha_composite(shadow_layer)
 
-    # Imagen del producto
     img_copy = img_obj.copy().convert("RGBA")
-    max_product_size = 680
+    max_product_size = 700
     img_copy.thumbnail((max_product_size, max_product_size), Image.Resampling.LANCZOS)
     product_w, product_h = img_copy.size
     product_x = card_x + (card_w - product_w) // 2
@@ -764,137 +806,110 @@ def create_story_template(product, img_obj):
 
     draw = ImageDraw.Draw(bg)
 
-    # --------------------------------------------------------
-    # BADGE PRECIO / ENCARGUE (Con más aire superior e inferior)
-    # --------------------------------------------------------
-    display_label = ">> PRODUCTO POR ENCARGUE <<" if product["is_on_demand"] else product["price"]
-    badge_font_size = 32 if product["is_on_demand"] else 46
-    font_badge = get_font(badge_font_size)
+    draw_sparkle(bg, card_x + card_w - 4, card_y + 8, accent_rgb, size=22)
+    draw_sparkle(bg, card_x + 10, card_y + card_h - 2, secondary_rgb, size=15)
+
+    display_label = "POR ENCARGUE" if product["is_on_demand"] else f'{product["price"]} ARS'
+    badge_font_size = 34 if product["is_on_demand"] else 44
+    font_badge = get_heading_font(badge_font_size)
 
     bbox = draw.textbbox((0, 0), display_label, font=font_badge)
     text_w, text_h = bbox[2] - bbox[0], bbox[3] - bbox[1]
     badge_w = min(text_w + 100, 920)
-    badge_h = text_h + 74  # Más aire de arriba y de abajo
+    badge_h = text_h + 48
 
     badge_x1 = (canvas_w - badge_w) // 2
     badge_y1 = card_y + card_h - (badge_h // 2)
     badge_x2 = badge_x1 + badge_w
     badge_y2 = badge_y1 + badge_h
 
-    # Glow badge
     badge_glow = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     bgd = ImageDraw.Draw(badge_glow)
     bgd.rounded_rectangle(
-        (badge_x1 - 8, badge_y1 - 8, badge_x2 + 8, badge_y2 + 8),
-        radius=22,
-        fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 170),
+        (badge_x1 - 10, badge_y1 - 10, badge_x2 + 10, badge_y2 + 10),
+        radius=24, fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 190),
     )
-    badge_glow = badge_glow.filter(ImageFilter.GaussianBlur(16))
+    badge_glow = badge_glow.filter(ImageFilter.GaussianBlur(18))
     bg.alpha_composite(badge_glow)
 
     draw = ImageDraw.Draw(bg)
+    badge_text_color = get_contrast_text_color(accent_rgb)
 
     if product["is_on_demand"]:
-        # Reborde CURVO (rounded rectangle) para productos por encargue
         draw.rounded_rectangle(
-            (badge_x1, badge_y1, badge_x2, badge_y2),
-            radius=22,
-            fill=(10, 12, 18, 245),
-            outline=accent_hex,
-            width=6,
+            (badge_x1, badge_y1, badge_x2, badge_y2), radius=24,
+            fill=(10, 12, 18, 250), outline=accent_hex, width=6,
         )
+        badge_text_color = "#FFFFFF"
     else:
-        # Reborde POLIGONAL (esquinas cortadas) para productos con precio
-        cut = 18
+        cut = 20
         poly_points = [
-            (badge_x1 + cut, badge_y1),
-            (badge_x2 - cut, badge_y1),
-            (badge_x2, badge_y1 + cut),
-            (badge_x2, badge_y2 - cut),
-            (badge_x2 - cut, badge_y2),
-            (badge_x1 + cut, badge_y2),
-            (badge_x1, badge_y2 - cut),
-            (badge_x1, badge_y1 + cut),
+            (badge_x1 + cut, badge_y1), (badge_x2 - cut, badge_y1),
+            (badge_x2, badge_y1 + cut), (badge_x2, badge_y2 - cut),
+            (badge_x2 - cut, badge_y2), (badge_x1 + cut, badge_y2),
+            (badge_x1, badge_y2 - cut), (badge_x1, badge_y1 + cut),
         ]
-        draw.polygon(poly_points, fill=(10, 12, 18, 245))
-        draw.line(poly_points + [poly_points[0]], fill=accent_hex, width=6, joint="curve")
+        draw.polygon(poly_points, fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 255))
+        draw.line(poly_points + [poly_points[0]], fill=(255, 255, 255, 235), width=4, joint="curve")
 
     draw.text(
         ((badge_x1 + badge_x2) // 2, (badge_y1 + badge_y2) // 2 - 2),
-        display_label,
-        fill=accent_hex,
-        font=font_badge,
-        anchor="mm",
+        display_label, fill=badge_text_color, font=font_badge, anchor="mm",
     )
 
-    # --------------------------------------------------------
-    # CTA (LLAMADA A LA ACCIÓN INFERIOR - Mayúsculas, sin emoji, más aire, dos líneas)
-    # --------------------------------------------------------
     if product["is_on_demand"]:
         cta_options = [
-            "RESPONDE 'QUIERO' POR DM PARA ENCARGARLO",
-            "MANDA 'QUIERO' POR DM Y TE ASESORAMOS",
-            "ESCRIBINOS 'QUIERO' Y LO TRAEMOS PARA VOS",
+            "Respondé 'QUIERO' por DM para encargarlo",
+            "Mandá 'QUIERO' por DM y te asesoramos",
+            "Escribinos 'QUIERO' y lo traemos para vos",
         ]
     else:
         cta_options = [
-            "RESPONDE 'INFO' PARA COMPRAR",
-            "COMENTA 'QUIERO' POR DM PARA COMPRAR",
-            "MANDA 'LINK' POR DM Y CONSEGUILO HOY",
-            "RESPONDE 'INFO' PARA ENVIARTE LA OFERTA",
+            "Respondé 'INFO' para comprar",
+            "Comentá 'QUIERO' por DM para comprar",
+            "Mandá 'LINK' por DM y conseguilo hoy",
+            "Respondé 'INFO' para enviarte la oferta",
         ]
 
     cta_text = random.choice(cta_options)
-    font_cta = get_font(34)
+    font_cta = get_heading_font(32)
 
-    # Envolver texto en dos líneas si es necesario
-    wrapped_cta_lines = textwrap.wrap(cta_text, width=30)
-    cta_multiline_text = "\n".join(wrapped_cta_lines[:2])
+    bbox_cta = draw.textbbox((0, 0), cta_text, font=font_cta)
+    cta_text_w = bbox_cta[2] - bbox_cta[0]
 
-    cta_box_w = 940
-    cta_box_h = 135  # Mayor altura para dar más aire superior e inferior
+    icon_radius = 26
+    icon_gap = 18
+    group_w = (icon_radius * 2) + icon_gap + cta_text_w
+    cta_box_w = min(group_w + 110, 980)
+    cta_box_h = 96
     cta_x1 = (canvas_w - cta_box_w) // 2
-    cta_y1 = canvas_h - 290
+    cta_y1 = canvas_h - 260
     cta_x2 = cta_x1 + cta_box_w
     cta_y2 = cta_y1 + cta_box_h
 
-    # Glow neón CTA
     cta_glow = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     cta_glow_draw = ImageDraw.Draw(cta_glow)
     cta_glow_draw.rounded_rectangle(
         (cta_x1 - 12, cta_y1 - 12, cta_x2 + 12, cta_y2 + 12),
-        radius=28,
-        fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 180),
+        radius=28, fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 190),
     )
     cta_glow = cta_glow.filter(ImageFilter.GaussianBlur(18))
     bg.alpha_composite(cta_glow)
 
     draw = ImageDraw.Draw(bg)
     draw.rounded_rectangle(
-        (cta_x1, cta_y1, cta_x2, cta_y2),
-        radius=20,
-        fill=(10, 12, 18, 245),
-        outline=accent_hex,
-        width=6,
+        (cta_x1, cta_y1, cta_x2, cta_y2), radius=20,
+        fill=(10, 12, 18, 248), outline=accent_hex, width=6,
     )
 
-    # Usar multiline_textbbox para centrar el bloque CTA vertical y horizontalmente sin usar anchor
-    cta_bbox = draw.multiline_textbbox((0, 0), cta_multiline_text, font=font_cta, spacing=6, align="center")
-    cta_tw = cta_bbox[2] - cta_bbox[0]
-    cta_th = cta_bbox[3] - cta_bbox[1]
-    cta_text_x = (canvas_w - cta_tw) // 2
-    cta_text_y = cta_y1 + (cta_box_h - cta_th) // 2
+    group_x1 = canvas_w // 2 - group_w // 2
+    icon_cx = group_x1 + icon_radius
+    icon_cy = (cta_y1 + cta_y2) // 2
+    text_x = icon_cx + icon_radius + icon_gap
 
-    draw.multiline_text(
-        (cta_text_x, cta_text_y),
-        cta_multiline_text,
-        fill="#FFFFFF",
-        font=font_cta,
-        align="center",
-        spacing=6,
-    )
+    draw_chat_icon(bg, icon_cx, icon_cy, accent_rgb, radius=icon_radius)
+    draw.text((text_x, icon_cy), cta_text, fill="#FFFFFF", font=font_cta, anchor="lm")
 
-    # Guardar
     output_path = f"story_{product['id']}.jpg"
     final_image = bg.convert("RGB")
     final_image.save(output_path, "JPEG", quality=95, optimize=True)
