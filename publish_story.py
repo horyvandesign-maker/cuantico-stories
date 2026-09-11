@@ -688,7 +688,7 @@ def create_story_template(product, img_obj):
     ai_name = product.get("ai_name", product["original_name"]).upper()
     wrapped_lines = textwrap.wrap(ai_name, width=22)
     wrapped_text = "\n".join(wrapped_lines[:2])
-    title_y = card_y + card_h + 95
+    title_y = card_y + card_h + 125
 
     draw.multiline_text((canvas_w // 2 + 3, title_y + 3), wrapped_text, fill=(0, 0, 0, 200), font=font_title, anchor="mm", align="center", spacing=8)
     draw.multiline_text((canvas_w // 2, title_y), wrapped_text, fill="#FFFFFF", font=font_title, anchor="mm", align="center", spacing=8)
