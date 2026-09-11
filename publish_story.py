@@ -564,7 +564,7 @@ def fetch_all_catalog_products():
 
 
 # ============================================================
-# CREACIÓN DE STORY (TÍTULO ARRIBA, BORDES GRUESOS Y NEÓN POTENCIADO)
+# CREACIÓN DE STORY (TÍTULO MAYÚSCULAS L/R, BORDES GRUESOS)
 # ============================================================
 
 def create_story_template(product, img_obj):
@@ -578,7 +578,7 @@ def create_story_template(product, img_obj):
 
     print(f"Story {product['id']} color={accent_hex} secundario={secondary_hex}")
 
-    # Fondo base con blur y oscuridad (mantenemos exactamente el generador actual)
+    # Fondo base con blur y oscuridad
     background_source = img_obj.convert("RGB").resize((canvas_w, canvas_h))
     background_source = background_source.filter(ImageFilter.GaussianBlur(random.randint(65, 95))).convert("RGBA")
 
@@ -617,55 +617,100 @@ def create_story_template(product, img_obj):
     draw = ImageDraw.Draw(bg)
 
     # --------------------------------------------------------
-    # LOGO (Arriba de todo)
+    # ENCABEZADO: LOGO + TÍTULO MAYÚSCULAS (Distribución aleatoria izq/der)
     # --------------------------------------------------------
     logo_path = os.path.join(os.path.dirname(__file__), "logo_canva.png")
-    logo_h_space = 140
     has_logo = False
+    logo_w, logo_h = 0, 0
+    logo_img = None
+
     if os.path.exists(logo_path):
         try:
             logo_img = Image.open(logo_path).convert("RGBA")
-            logo_img.thumbnail((450, 150), Image.Resampling.LANCZOS)
+            logo_img.thumbnail((300, 120), Image.Resampling.LANCZOS)
             logo_w, logo_h = logo_img.size
-            bg.paste(logo_img, ((canvas_w - logo_w) // 2, 90), logo_img)
-            logo_h_space = 90 + logo_h + 25
             has_logo = True
         except Exception as error:
             print(f"Error logo: {error}")
 
-    if not has_logo:
-        draw.text((canvas_w // 2, 120), "CUANTICO PC", fill="#FFFFFF", font=get_font(45), anchor="mm")
-        logo_h_space = 160
-
-    # --------------------------------------------------------
-    # TÍTULO (Arriba, debajo del logo)
-    # --------------------------------------------------------
-    font_title = get_font(44)
-    ai_name = product.get("ai_name", product["original_name"])
-    wrapped_lines = textwrap.wrap(ai_name, width=22)
+    header_layout = random.choice(["logo_left", "logo_right"])
+    font_title = get_font(46)
+    ai_name = product.get("ai_name", product["original_name"]).upper()
+    wrapped_lines = textwrap.wrap(ai_name, width=19)
     wrapped_text = "\n".join(wrapped_lines[:2])
-    title_y = logo_h_space + 10
 
-    # Sombra del título
-    draw.multiline_text(
-        (canvas_w // 2 + 3, title_y + 3),
-        wrapped_text,
-        fill=(0, 0, 0, 220),
-        font=font_title,
-        anchor="mm",
-        align="center",
-        spacing=8,
-    )
-    # Texto principal del título
-    draw.multiline_text(
-        (canvas_w // 2, title_y),
-        wrapped_text,
-        fill="#FFFFFF",
-        font=font_title,
-        anchor="mm",
-        align="center",
-        spacing=8,
-    )
+    header_y_center = 145
+
+    if has_logo:
+        if header_layout == "logo_left":
+            logo_x = 60
+            logo_y = header_y_center - (logo_h // 2)
+            bg.paste(logo_img, (logo_x, logo_y), logo_img)
+
+            text_x = logo_x + logo_w + 35
+            # Sombra y texto principal alineados a la izquierda
+            draw.multiline_text(
+                (text_x + 3, header_y_center + 3),
+                wrapped_text,
+                fill=(0, 0, 0, 220),
+                font=font_title,
+                anchor="lm",
+                align="left",
+                spacing=6,
+            )
+            draw.multiline_text(
+                (text_x, header_y_center),
+                wrapped_text,
+                fill="#FFFFFF",
+                font=font_title,
+                anchor="lm",
+                align="left",
+                spacing=6,
+            )
+        else:
+            logo_x = canvas_w - logo_w - 60
+            logo_y = header_y_center - (logo_h // 2)
+            bg.paste(logo_img, (logo_x, logo_y), logo_img)
+
+            text_x = 60
+            draw.multiline_text(
+                (text_x + 3, header_y_center + 3),
+                wrapped_text,
+                fill=(0, 0, 0, 220),
+                font=font_title,
+                anchor="lt",
+                align="left",
+                spacing=6,
+            )
+            draw.multiline_text(
+                (text_x, header_y_center),
+                wrapped_text,
+                fill="#FFFFFF",
+                font=font_title,
+                anchor="lt",
+                align="left",
+                spacing=6,
+            )
+    else:
+        # Fallback sin logo: centrado
+        draw.multiline_text(
+            (canvas_w // 2 + 3, header_y_center + 3),
+            wrapped_text,
+            fill=(0, 0, 0, 220),
+            font=font_title,
+            anchor="mm",
+            align="center",
+            spacing=6,
+        )
+        draw.multiline_text(
+            (canvas_w // 2, header_y_center),
+            wrapped_text,
+            fill="#FFFFFF",
+            font=font_title,
+            anchor="mm",
+            align="center",
+            spacing=6,
+        )
 
     # --------------------------------------------------------
     # TARJETA DEL PRODUCTO
@@ -673,7 +718,7 @@ def create_story_template(product, img_obj):
     card_w = 840
     card_h = 840
     card_x = (canvas_w - card_w) // 2
-    card_y = title_y + (len(wrapped_lines[:2]) * 55) + 35
+    card_y = 260
 
     # Glow neón para la tarjeta
     card_glow = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
@@ -715,8 +760,7 @@ def create_story_template(product, img_obj):
     draw = ImageDraw.Draw(bg)
 
     # --------------------------------------------------------
-    # BADGE PRECIO / ENCARGUE (Solapado abajo de la tarjeta)
-    # Reborde curvo para por encargue, poligonal para precio
+    # BADGE PRECIO / ENCARGUE (Con más aire superior e inferior)
     # --------------------------------------------------------
     display_label = ">> PRODUCTO POR ENCARGUE <<" if product["is_on_demand"] else product["price"]
     badge_font_size = 32 if product["is_on_demand"] else 46
@@ -724,8 +768,8 @@ def create_story_template(product, img_obj):
 
     bbox = draw.textbbox((0, 0), display_label, font=font_badge)
     text_w, text_h = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    badge_w = min(text_w + 90, 920)
-    badge_h = text_h + 44
+    badge_w = min(text_w + 100, 920)
+    badge_h = text_h + 74  # Más aire de arriba y de abajo
 
     badge_x1 = (canvas_w - badge_w) // 2
     badge_y1 = card_y + card_h - (badge_h // 2)
@@ -779,28 +823,33 @@ def create_story_template(product, img_obj):
     )
 
     # --------------------------------------------------------
-    # CTA (LLAMADA A LA ACCIÓN INFERIOR - Borde ancho width=6)
+    # CTA (LLAMADA A LA ACCIÓN INFERIOR - Mayúsculas, sin emoji, más aire, dos líneas)
     # --------------------------------------------------------
     if product["is_on_demand"]:
         cta_options = [
-            "Respondé 'QUIERO' por DM para encargarlo",
-            "Mandá 'QUIERO' por DM y te asesoramos",
-            "Escribinos 'QUIERO' y lo traemos para vos",
+            "RESPONDE 'QUIERO' POR DM PARA ENCARGARLO",
+            "MANDA 'QUIERO' POR DM Y TE ASESORAMOS",
+            "ESCRIBINOS 'QUIERO' Y LO TRAEMOS PARA VOS",
         ]
     else:
         cta_options = [
-            "Respondé 'INFO' para comprar",
-            "Comentá 'QUIERO' por DM para comprar",
-            "Mandá 'LINK' por DM y conseguilo hoy",
-            "Respondé 'INFO' para enviarte la oferta",
+            "RESPONDE 'INFO' PARA COMPRAR",
+            "COMENTA 'QUIERO' POR DM PARA COMPRAR",
+            "MANDA 'LINK' POR DM Y CONSEGUILO HOY",
+            "RESPONDE 'INFO' PARA ENVIARTE LA OFERTA",
         ]
 
     cta_text = random.choice(cta_options)
+    font_cta = get_font(34)
+
+    # Envolver texto en dos líneas si es necesario
+    wrapped_cta_lines = textwrap.wrap(cta_text, width=30)
+    cta_multiline_text = "\n".join(wrapped_cta_lines[:2])
 
     cta_box_w = 940
-    cta_box_h = 92
+    cta_box_h = 135  # Mayor altura para dar más aire superior e inferior
     cta_x1 = (canvas_w - cta_box_w) // 2
-    cta_y1 = canvas_h - 260
+    cta_y1 = canvas_h - 290
     cta_x2 = cta_x1 + cta_box_w
     cta_y2 = cta_y1 + cta_box_h
 
@@ -824,13 +873,14 @@ def create_story_template(product, img_obj):
         width=6,
     )
 
-    font_cta = get_font(30)
-    draw.text(
+    draw.multiline_text(
         (canvas_w // 2, (cta_y1 + cta_y2) // 2),
-        cta_text,
+        cta_multiline_text,
         fill="#FFFFFF",
         font=font_cta,
         anchor="mm",
+        align="center",
+        spacing=6,
     )
 
     # Guardar
