@@ -1533,11 +1533,10 @@ def create_story_template(
         anchor="mm",
     )
 
-    # --------------------------------------------------------
-    # CTA (LLAMADA A LA ACCIÓN OPTIMIZADA)
+# --------------------------------------------------------
+    # CTA (LLAMADA A LA ACCIÓN OPTIMIZADA - NEÓN REFORZADO)
     # --------------------------------------------------------
 
-    # Copy dinámico limpio (sin emojis para evitar glifos rotos '□')
     if product["is_on_demand"]:
         cta_options = [
             "Respondé 'QUIERO' por DM para encargarlo",
@@ -1554,7 +1553,6 @@ def create_story_template(
 
     cta_text = random.choice(cta_options)
 
-    # Dimensiones y resguardo de Safe Zone
     cta_box_w = 940
     cta_box_h = 92
 
@@ -1563,19 +1561,19 @@ def create_story_template(
     cta_x2 = cta_x1 + cta_box_w
     cta_y2 = cta_y1 + cta_box_h
 
-    # Resplandor neón exterior
+    # Glow neón exterior ampliado e intensificado
     cta_glow = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     cta_glow_draw = ImageDraw.Draw(cta_glow)
     
     cta_glow_draw.rounded_rectangle(
-        (cta_x1 - 8, cta_y1 - 8, cta_x2 + 8, cta_y2 + 8),
-        radius=26,
-        fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 150),
+        (cta_x1 - 12, cta_y1 - 12, cta_x2 + 12, cta_y2 + 12),
+        radius=28,
+        fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 180),
     )
-    cta_glow = cta_glow.filter(ImageFilter.GaussianBlur(14))
+    cta_glow = cta_glow.filter(ImageFilter.GaussianBlur(18))
     bg.alpha_composite(cta_glow)
 
-    # Caja principal del CTA
+    # Caja principal con borde neón engrosado (width=5)
     draw = ImageDraw.Draw(bg)
 
     draw.rounded_rectangle(
@@ -1583,10 +1581,9 @@ def create_story_template(
         radius=20,
         fill=(10, 12, 18, 245),
         outline=accent_hex,
-        width=3,
+        width=5,  # Borde más grueso y marcado
     )
 
-    # Texto perfectamente centrado
     font_cta = get_font(30)
 
     draw.text(
