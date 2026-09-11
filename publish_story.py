@@ -640,6 +640,17 @@ def create_story_template(product, img_obj):
     wrapped_text = "\n".join(wrapped_lines[:2])
 
     header_y_center = 145
+    line_spacing = 6
+
+    # Calcular dimensiones del bloque multilínea para posicionarlo sin usar anchor
+    temp_img = Image.new("RGBA", (canvas_w, canvas_h))
+    temp_draw = ImageDraw.Draw(temp_img)
+    align_mode = "left" if has_logo else "center"
+    
+    bbox = temp_draw.multiline_textbbox((0, 0), wrapped_text, font=font_title, spacing=line_spacing, align=align_mode)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    text_y = header_y_center - (text_h // 2)
 
     if has_logo:
         if header_layout == "logo_left":
@@ -650,22 +661,20 @@ def create_story_template(product, img_obj):
             text_x = logo_x + logo_w + 35
             # Sombra y texto principal alineados a la izquierda
             draw.multiline_text(
-                (text_x + 3, header_y_center + 3),
+                (text_x + 3, text_y + 3),
                 wrapped_text,
                 fill=(0, 0, 0, 220),
                 font=font_title,
-                anchor="lm",
                 align="left",
-                spacing=6,
+                spacing=line_spacing,
             )
             draw.multiline_text(
-                (text_x, header_y_center),
+                (text_x, text_y),
                 wrapped_text,
                 fill="#FFFFFF",
                 font=font_title,
-                anchor="lm",
                 align="left",
-                spacing=6,
+                spacing=line_spacing,
             )
         else:
             logo_x = canvas_w - logo_w - 60
@@ -674,42 +683,38 @@ def create_story_template(product, img_obj):
 
             text_x = 60
             draw.multiline_text(
-                (text_x + 3, header_y_center + 3),
+                (text_x + 3, text_y + 3),
                 wrapped_text,
                 fill=(0, 0, 0, 220),
                 font=font_title,
-                anchor="lt",
                 align="left",
-                spacing=6,
+                spacing=line_spacing,
             )
             draw.multiline_text(
-                (text_x, header_y_center),
+                (text_x, text_y),
                 wrapped_text,
                 fill="#FFFFFF",
                 font=font_title,
-                anchor="lt",
                 align="left",
-                spacing=6,
+                spacing=line_spacing,
             )
     else:
-        # Fallback sin logo: centrado
+        text_x = (canvas_w - text_w) // 2
         draw.multiline_text(
-            (canvas_w // 2 + 3, header_y_center + 3),
+            (text_x + 3, text_y + 3),
             wrapped_text,
             fill=(0, 0, 0, 220),
             font=font_title,
-            anchor="mm",
             align="center",
-            spacing=6,
+            spacing=line_spacing,
         )
         draw.multiline_text(
-            (canvas_w // 2, header_y_center),
+            (text_x, text_y),
             wrapped_text,
             fill="#FFFFFF",
             font=font_title,
-            anchor="mm",
             align="center",
-            spacing=6,
+            spacing=line_spacing,
         )
 
     # --------------------------------------------------------
@@ -873,12 +878,18 @@ def create_story_template(product, img_obj):
         width=6,
     )
 
+    # Usar multiline_textbbox para centrar el bloque CTA vertical y horizontalmente sin usar anchor
+    cta_bbox = draw.multiline_textbbox((0, 0), cta_multiline_text, font=font_cta, spacing=6, align="center")
+    cta_tw = cta_bbox[2] - cta_bbox[0]
+    cta_th = cta_bbox[3] - cta_bbox[1]
+    cta_text_x = (canvas_w - cta_tw) // 2
+    cta_text_y = cta_y1 + (cta_box_h - cta_th) // 2
+
     draw.multiline_text(
-        (canvas_w // 2, (cta_y1 + cta_y2) // 2),
+        (cta_text_x, cta_text_y),
         cta_multiline_text,
         fill="#FFFFFF",
         font=font_cta,
-        anchor="mm",
         align="center",
         spacing=6,
     )
