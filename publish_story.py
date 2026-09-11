@@ -1,5 +1,5 @@
 # ============================================================
-# 11/09 - ambos botones publican y muestran la imagen q se va a publicar
+# 11/09 - Ajustes de espaciado y ancho de CTA
 # ============================================================
 
 import os
@@ -31,11 +31,7 @@ ACCESS_TOKEN = os.environ.get("INSTAGRAM_ACCESS_TOKEN")
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# Opcional.
-# Si no está configurado se usa tmpfiles.org como fallback.
 FREEIMAGE_API_KEY = os.environ.get("FREEIMAGE_API_KEY")
-
-# Permite cambiar la versión desde GitHub Secrets/Variables
 META_API_VERSION = os.environ.get("META_API_VERSION", "v26.0")
 
 SITE_URL = "https://cuanticopc.com.ar"
@@ -615,13 +611,13 @@ def create_story_template(product, img_obj):
     bg.alpha_composite(tech_layer)
 
     # --------------------------------------------------------
-    # 1. TARJETA DE PRODUCTO (BORDE Y NEÓN MÁS MARCADO)
+    # 1. TARJETA DE PRODUCTO
     # --------------------------------------------------------
     card_w, card_h = random.randint(825, 865), random.randint(825, 865)
     card_x = (canvas_w - card_w) // 2
     card_y = random.randint(405, 435)
 
-    # Halo de neón más intenso y marcado por detrás de la tarjeta
+    # Halo de neón
     neon_glow = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     ng_draw = ImageDraw.Draw(neon_glow)
     for offset in range(45, 0, -5):
@@ -647,19 +643,19 @@ def create_story_template(product, img_obj):
     card_mask_draw.rounded_rectangle((0, 0, card_w - 1, card_h - 1), radius=30, fill=255)
     bg.paste(card_bg, (card_x, card_y), card_mask)
 
-    # Líneas sólidas del borde más gruesas y marcadas (por encima del fondo blanco)
+    # Líneas sólidas del borde
     draw = ImageDraw.Draw(bg)
     draw.rounded_rectangle(
         (card_x, card_y, card_x + card_w, card_y + card_h),
         radius=35,
         outline=accent_hex,
-        width=10,  # Borde principal más grueso
+        width=10,
     )
     draw.rounded_rectangle(
         (card_x + 4, card_y + 4, card_x + card_w - 4, card_y + card_h - 4),
         radius=31,
         outline="#FFFFFF",
-        width=2,   # Reborde interior blanco más marcado
+        width=2,
     )
 
     # Producto
@@ -687,18 +683,18 @@ def create_story_template(product, img_obj):
     else:
         draw.text((canvas_w // 2, 190), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
 
-    # Título (En Mayúsculas)
+    # Título (En Mayúsculas y un poco más abajo)
     font_title = get_font(42)
     ai_name = product.get("ai_name", product["original_name"]).upper()
     wrapped_lines = textwrap.wrap(ai_name, width=22)
     wrapped_text = "\n".join(wrapped_lines[:2])
-    title_y = card_y + card_h + 78
+    title_y = card_y + card_h + 95
 
     draw.multiline_text((canvas_w // 2 + 3, title_y + 3), wrapped_text, fill=(0, 0, 0, 200), font=font_title, anchor="mm", align="center", spacing=8)
     draw.multiline_text((canvas_w // 2, title_y), wrapped_text, fill="#FFFFFF", font=font_title, anchor="mm", align="center", spacing=8)
 
     # --------------------------------------------------------
-    # 2. BADGE PRECIO / ENCARGUE
+    # 2. BADGE PRECIO / ENCARGUE (Un poco más abajo)
     # --------------------------------------------------------
     display_label = ">> PRODUCTO POR ENCARGUE <<" if product["is_on_demand"] else product["price"]
     badge_font_size = 34 if product["is_on_demand"] else 54
@@ -708,7 +704,7 @@ def create_story_template(product, img_obj):
     text_w, text_h = bbox[2] - bbox[0], bbox[3] - bbox[1]
     badge_w, badge_h = min(text_w + 100, 980), text_h + 48
     badge_x1 = (canvas_w - badge_w) // 2
-    badge_y1 = title_y + 90
+    badge_y1 = title_y + 100
     badge_x2, badge_y2 = badge_x1 + badge_w, badge_y1 + badge_h
 
     # Glow Neón Badge
@@ -729,7 +725,7 @@ def create_story_template(product, img_obj):
     draw.text(((badge_x1 + badge_x2) // 2, (badge_y1 + badge_y2) // 2 - 2), display_label, fill=accent_hex, font=font_badge, anchor="mm")
 
     # --------------------------------------------------------
-    # 3. CAJA CTA
+    # 3. CAJA CTA (Mismo ancho que la tarjeta principal y más abajo)
     # --------------------------------------------------------
     if product["is_on_demand"]:
         cta_options = [
@@ -746,9 +742,9 @@ def create_story_template(product, img_obj):
         ]
 
     cta_text = random.choice(cta_options)
-    cta_box_w, cta_box_h = 940, 92
-    cta_x1 = (canvas_w - cta_box_w) // 2
-    cta_y1 = canvas_h - 280
+    cta_box_w, cta_box_h = card_w, 92  # Mismo ancho exacto que la tarjeta
+    cta_x1 = card_x  # Alineado perfectamente con la tarjeta
+    cta_y1 = badge_y2 + 45  # Ubicado más abajo, debajo del badge de precio
     cta_x2, cta_y2 = cta_x1 + cta_box_w, cta_y1 + cta_box_h
 
     # Glow Neón CTA
@@ -769,7 +765,7 @@ def create_story_template(product, img_obj):
     )
 
     font_cta = get_font(30)
-    draw.text(((canvas_w // 2), (cta_y1 + cta_y2) // 2), cta_text, fill="#FFFFFF", font=font_cta, anchor="mm")
+    draw.text(((cta_x1 + cta_x2) // 2, (cta_y1 + cta_y2) // 2), cta_text, fill="#FFFFFF", font=font_cta, anchor="mm")
 
     # Guardar
     output_path = f"story_{product['id']}.jpg"
