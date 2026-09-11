@@ -1935,160 +1935,103 @@ def delete_local_file(path):
 # CICLO PRINCIPAL
 # ============================================================
 
-def process_catalog(
-    auto_approve=False,
-):
-    products = (
-        fetch_all_catalog_products()
-    )
+def process_catalog(auto_approve=False):
+    products = fetch_all_catalog_products()
+    
     if not products:
-        if bot:
+        if bot and TELEGRAM_CHAT_ID:
             bot.send_message(
                 TELEGRAM_CHAT_ID,
-                "❌ No hay productos nuevos "
-                "para publicar.",
+                "❌ No hay productos nuevos para publicar.",
             )
         return
+
     headers = {
-        "User-Agent": (
-            "Mozilla/5.0 "
-            "(Windows NT 10.0; Win64; x64)"
-        )
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
     }
     total = len(products)
-    if bot:
+
+    if bot and TELEGRAM_CHAT_ID:
         bot.send_message(
             TELEGRAM_CHAT_ID,
-            "🚀 <b>Sistema de rotación activo:</b> Procesando producto en turno.",
+            "🚀 <b>Procesando diseño de Story...</b>",
             parse_mode="HTML",
         )
-    for index, product in enumerate(
-        products,
-        start=1,
-    ):
+
+    for index, product in enumerate(products, start=1):
         image_path = None
         try:
-
-            # ------------------------------------------------
-            # DESCARGAR IMAGEN
-            # ------------------------------------------------
-
+            # 1. Descargar imagen base
             image_response = requests.get(
                 product["raw_url"],
                 headers=headers,
                 timeout=20,
             )
 
-            if (
-                image_response.status_code
-                != 200
-            ):
-
-                print(
-                    f"[{index}/{total}] "
-                    "No se pudo descargar imagen."
-                )
-
+            if image_response.status_code != 200:
+                print(f"[{index}/{total}] No se pudo descargar imagen.")
                 continue
 
-            img_obj = Image.open(
-                BytesIO(
-                    image_response.content
-                )
-            ).convert("RGBA")
+            img_obj = Image.open(BytesIO(image_response.content)).convert("RGBA")
 
-            # ------------------------------------------------
-            # TÍTULO IA
-            # ------------------------------------------------
-
-            product["ai_name"] = (
-                generate_ai_title(
-                    product[
-                        "original_name"
-                    ],
-                    product[
-                        "permalink"
-                    ],
-                )
+            # 2. Generar título con IA
+            product["ai_name"] = generate_ai_title(
+                product["original_name"],
+                product["permalink"],
             )
 
-            # ------------------------------------------------
-            # CREAR DISEÑO
-            # ------------------------------------------------
+            # 3. Crear diseño gráfico de la Story (.jpg)
+            image_path = create_story_template(product, img_obj)
 
-            image_path = (
-                create_story_template(
-                    product,
-                    img_obj,
-                )
-            )
-
-# ------------------------------------------------
-            # AUTO APPROVE
-            # ------------------------------------------------
-
+            # ----------------------------------------------------
+            # MODO AUTOMÁTICO (Publicar directo y enviar preview)
+            # ----------------------------------------------------
             if auto_approve:
-
-                success, result = (
-                    publish_to_instagram(
-                        image_path,
-                        product["permalink"],
-                    )
+                success, result = publish_to_instagram(
+                    image_path,
+                    product["permalink"],
                 )
 
                 if success:
+                    save_to_history(product["id"])
+                    print(f"[{index}/{total}] Publicado automáticamente.")
 
-                    save_to_history(
-                        product["id"]
-                    )
-
-                    print(
-                        f"[{index}/{total}] "
-                        "Publicado automáticamente."
-                    )
-
-                    # Notificación de éxito por Telegram
                     if bot and TELEGRAM_CHAT_ID:
                         try:
                             escaped_name = html.escape(product["original_name"])
                             escaped_ai_name = html.escape(product.get("ai_name", product["original_name"]))
                             escaped_permalink = html.escape(product["permalink"], quote=True)
-                            
                             type_str = "📦 POR ENCARGUE" if product["is_on_demand"] else f"💰 {product['price']}"
 
                             caption = (
-                                "🎉 <b>¡Story publicada automáticamente con éxito!</b>\n\n"
+                                "🎉 <b>¡Story publicada con éxito!</b>\n\n"
                                 f"📦 <b>{escaped_name}</b>\n"
                                 f"🤖 Título Story: <b>{escaped_ai_name}</b>\n"
-                                f"Estado: <b>{type_str}</b>\n\n"
+                                f"Estado: <b>{type_str}</b>\n"
+                                f"🎨 Color: <code>{_last_accent}</code>\n\n"
                                 f"🔗 <a href=\"{escaped_permalink}\">Ver producto en tienda</a>"
                             )
 
-                            bot.send_message(
-                                TELEGRAM_CHAT_ID,
-                                caption,
-                                parse_mode="HTML",
-                                disable_web_page_preview=False,
-                            )
+                            # Enviar la imagen de la Story a Telegram
+                            with open(image_path, "rb") as photo:
+                                bot.send_photo(
+                                    TELEGRAM_CHAT_ID,
+                                    photo,
+                                    caption=caption,
+                                    parse_mode="HTML",
+                                )
                         except Exception as err:
-                            print(f"Error enviando notificación a Telegram: {err}")
+                            print(f"Error enviando foto a Telegram: {err}")
 
                 else:
-
-                    print(
-                        f"[{index}/{total}] "
-                        "Error Instagram: "
-                        f"{result}"
-                    )
-
-                    # Notificación de error por Telegram
+                    print(f"[{index}/{total}] Error Instagram: {result}")
                     if bot and TELEGRAM_CHAT_ID:
                         try:
                             safe_error = html.escape(str(result))
                             bot.send_message(
                                 TELEGRAM_CHAT_ID,
                                 (
-                                    "❌ <b>Error en publicación automática de Instagram:</b>\n"
+                                    "❌ <b>Error en publicación de Instagram:</b>\n"
                                     f"<code>{safe_error}</code>"
                                 ),
                                 parse_mode="HTML",
@@ -2096,50 +2039,29 @@ def process_catalog(
                         except Exception as err:
                             print(f"Error enviando notificación de error a Telegram: {err}")
 
-                delete_local_file(
-                    image_path
-                )
-
+                delete_local_file(image_path)
                 time.sleep(10)
-
                 continue
 
-            # ------------------------------------------------
-            # APROBACIÓN POR TELEGRAM
-            # ------------------------------------------------
-
+            # ----------------------------------------------------
+            # MODO MANUAL / PREVIEW (Aprobación interactiva)
+            # ----------------------------------------------------
             if not bot:
-
-                print(
-                    "TELEGRAM_BOT_TOKEN "
-                    "no configurado."
-                )
-
-                delete_local_file(
-                    image_path
-                )
-
+                print("TELEGRAM_BOT_TOKEN no configurado.")
+                delete_local_file(image_path)
                 return
 
             markup = InlineKeyboardMarkup()
-
             markup.row(
                 InlineKeyboardButton(
                     "✅ Publicar Story",
-                    callback_data=(
-                        f"approve_"
-                        f"{product['id']}"
-                    ),
+                    callback_data=f"approve_{product['id']}",
                 ),
                 InlineKeyboardButton(
                     "⏭️ Saltear",
-                    callback_data=(
-                        f"skip_"
-                        f"{product['id']}"
-                    ),
+                    callback_data=f"skip_{product['id']}",
                 ),
             )
-
             markup.row(
                 InlineKeyboardButton(
                     "🛑 Detener",
@@ -2147,53 +2069,22 @@ def process_catalog(
                 )
             )
 
-            if product["is_on_demand"]:
-
-                type_str = (
-                    "📦 POR ENCARGUE"
-                )
-
-            else:
-
-                type_str = (
-                    f"💰 {product['price']}"
-                )
-
-            escaped_name = html.escape(
-                product["original_name"]
-            )
-
-            escaped_permalink = (
-                html.escape(
-                    product["permalink"],
-                    quote=True,
-                )
-            )
-
-            escaped_ai_name = html.escape(
-                product["ai_name"]
-            )
+            type_str = "📦 POR ENCARGUE" if product["is_on_demand"] else f"💰 {product['price']}"
+            escaped_name = html.escape(product["original_name"])
+            escaped_permalink = html.escape(product["permalink"], quote=True)
+            escaped_ai_name = html.escape(product["ai_name"])
 
             caption = (
-                f"📦 <b>[{index}/{total}] "
-                f"{escaped_name}</b>\n\n"
-                f"🤖 Título Story: "
-                f"<b>{escaped_ai_name}</b>\n"
+                f"📦 <b>[{index}/{total}] {escaped_name}</b>\n\n"
+                f"🤖 Título Story: <b>{escaped_ai_name}</b>\n"
                 f"Estado: <b>{type_str}</b>\n"
-                f"🎨 Color: "
-                f"<code>{_last_accent}</code>\n\n"
-                f"🔗 <a href=\"{escaped_permalink}\">"
-                "Ver producto en tienda"
-                "</a>\n\n"
-                "¿Deseas publicar esta Story "
-                "en Instagram?"
+                f"🎨 Color: <code>{_last_accent}</code>\n\n"
+                f"🔗 <a href=\"{escaped_permalink}\">Ver producto en tienda</a>\n\n"
+                "¿Deseas publicar esta Story en Instagram?"
             )
 
-            with open(
-                image_path,
-                "rb",
-            ) as photo:
-
+            # Envía la vista previa generada
+            with open(image_path, "rb") as photo:
                 bot.send_photo(
                     TELEGRAM_CHAT_ID,
                     photo,
@@ -2204,51 +2095,28 @@ def process_catalog(
 
             user_choice["action"] = None
 
-            # Espera tu botón de Telegram.
+            # Espera la acción en Telegram
             bot.polling(
                 non_stop=False,
                 timeout=30,
                 long_polling_timeout=30,
             )
 
-            # ------------------------------------------------
-            # PUBLICAR
-            # ------------------------------------------------
-
-            if (
-                user_choice["action"]
-                == "approve"
-            ):
-
-                success, result = (
-                    publish_to_instagram(
-                        image_path,
-                        product["permalink"],
-                    )
+            if user_choice["action"] == "approve":
+                success, result = publish_to_instagram(
+                    image_path,
+                    product["permalink"],
                 )
 
                 if success:
-
-                    save_to_history(
-                        product["id"]
-                    )
-
+                    save_to_history(product["id"])
                     bot.send_message(
                         TELEGRAM_CHAT_ID,
-                        (
-                            "🎉 <b>¡Publicado "
-                            "con éxito en "
-                            "Instagram Stories!</b>"
-                        ),
+                        "🎉 <b>¡Publicado con éxito en Instagram Stories!</b>",
                         parse_mode="HTML",
                     )
-
                 else:
-
-                    safe_error = html.escape(
-                        str(result)
-                    )
-
+                    safe_error = html.escape(str(result))
                     bot.send_message(
                         TELEGRAM_CHAT_ID,
                         (
@@ -2257,65 +2125,26 @@ def process_catalog(
                         ),
                         parse_mode="HTML",
                     )
-
                 time.sleep(3)
 
-            # ------------------------------------------------
-            # SKIP
-            # ------------------------------------------------
+            elif user_choice["action"] == "skip":
+                print(f"[{index}/{total}] Producto salteado.")
 
-            elif (
-                user_choice["action"]
-                == "skip"
-            ):
-
-                print(
-                    f"[{index}/{total}] "
-                    "Producto salteado."
-                )
-
-            # ------------------------------------------------
-            # STOP
-            # ------------------------------------------------
-
-            elif (
-                user_choice["action"]
-                == "stop"
-            ):
-
+            elif user_choice["action"] == "stop":
                 bot.send_message(
                     TELEGRAM_CHAT_ID,
-                    (
-                        "🏁 <b>Proceso "
-                        "detenido.</b>"
-                    ),
+                    "🏁 <b>Proceso detenido.</b>",
                     parse_mode="HTML",
                 )
-
-                delete_local_file(
-                    image_path
-                )
-
+                delete_local_file(image_path)
                 break
 
-            delete_local_file(
-                image_path
-            )
+            delete_local_file(image_path)
 
         except Exception as error:
-
-            print(
-                f"Error procesando producto "
-                f"{product.get('id')}: "
-                f"{error}"
-            )
-
-            delete_local_file(
-                image_path
-            )
-
+            print(f"Error procesando producto {product.get('id')}: {error}")
+            delete_local_file(image_path)
             continue
-
 
 # ============================================================
 # MAIN
