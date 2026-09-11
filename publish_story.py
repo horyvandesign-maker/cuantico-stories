@@ -744,7 +744,7 @@ def create_story_template(product, img_obj):
     cta_text = random.choice(cta_options)
     cta_box_w, cta_box_h = card_w, 92  # Mismo ancho exacto que la tarjeta
     cta_x1 = card_x  # Alineado perfectamente con la tarjeta
-    cta_y1 = badge_y2 + 45  # Ubicado más abajo, debajo del badge de precio
+    cta_y1 = badge_y2 + 60  # Ubicado más abajo, debajo del badge de precio
     cta_x2, cta_y2 = cta_x1 + cta_box_w, cta_y1 + cta_box_h
 
     # Glow Neón CTA
