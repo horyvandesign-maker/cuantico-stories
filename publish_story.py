@@ -615,17 +615,17 @@ def create_story_template(product, img_obj):
     bg.alpha_composite(tech_layer)
 
     # --------------------------------------------------------
-    # 1. TARJETA DE PRODUCTO (CON EFECTO NEÓN Y FONDO BLANCO)
+    # 1. TARJETA DE PRODUCTO (BORDE Y NEÓN MÁS MARCADO)
     # --------------------------------------------------------
     card_w, card_h = random.randint(825, 865), random.randint(825, 865)
     card_x = (canvas_w - card_w) // 2
     card_y = random.randint(405, 435)
 
-    # Halo de neón difuso (por detrás de la tarjeta)
+    # Halo de neón más intenso y marcado por detrás de la tarjeta
     neon_glow = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     ng_draw = ImageDraw.Draw(neon_glow)
-    for offset in range(35, 0, -6):
-        alpha = int(15 + (35 - offset) * 3)
+    for offset in range(45, 0, -5):
+        alpha = int(25 + (45 - offset) * 4)
         ng_draw.rounded_rectangle(
             (
                 card_x - offset,
@@ -635,9 +635,9 @@ def create_story_template(product, img_obj):
             ),
             radius=35 + (offset // 2),
             outline=(accent_rgb[0], accent_rgb[1], accent_rgb[2], alpha),
-            width=4,
+            width=5,
         )
-    neon_glow = neon_glow.filter(ImageFilter.GaussianBlur(14))
+    neon_glow = neon_glow.filter(ImageFilter.GaussianBlur(10))
     bg.alpha_composite(neon_glow)
 
     # Fondo Blanco Interno de la tarjeta
@@ -647,19 +647,19 @@ def create_story_template(product, img_obj):
     card_mask_draw.rounded_rectangle((0, 0, card_w - 1, card_h - 1), radius=30, fill=255)
     bg.paste(card_bg, (card_x, card_y), card_mask)
 
-    # Líneas sólidas del borde (por encima del fondo blanco)
+    # Líneas sólidas del borde más gruesas y marcadas (por encima del fondo blanco)
     draw = ImageDraw.Draw(bg)
     draw.rounded_rectangle(
         (card_x, card_y, card_x + card_w, card_y + card_h),
         radius=35,
         outline=accent_hex,
-        width=5,
+        width=10,  # Borde principal más grueso
     )
     draw.rounded_rectangle(
-        (card_x + 3, card_y + 3, card_x + card_w - 3, card_y + card_h - 3),
-        radius=32,
+        (card_x + 4, card_y + 4, card_x + card_w - 4, card_y + card_h - 4),
+        radius=31,
         outline="#FFFFFF",
-        width=1,
+        width=2,   # Reborde interior blanco más marcado
     )
 
     # Producto
@@ -1036,7 +1036,7 @@ def process_catalog(auto_approve=False):
                     safe_error = html.escape(str(result))
                     bot.send_message(
                         TELEGRAM_CHAT_ID,
-                        f"❌ <b>Error Meta:</b>\n<code>{safe_error}</code>",
+                        f"f"❌ <b>Error Meta:</b>\n<code>{safe_error}</code>",
                         parse_mode="HTML",
                     )
                 time.sleep(3)
