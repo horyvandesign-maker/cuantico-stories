@@ -1036,7 +1036,7 @@ def process_catalog(auto_approve=False):
                     safe_error = html.escape(str(result))
                     bot.send_message(
                         TELEGRAM_CHAT_ID,
-                        f"f"❌ <b>Error Meta:</b>\n<code>{safe_error}</code>",
+                        f"❌ <b>Error Meta:</b>\n<code>{safe_error}</code>",
                         parse_mode="HTML",
                     )
                 time.sleep(3)
