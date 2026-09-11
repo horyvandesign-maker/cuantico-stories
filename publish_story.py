@@ -1534,62 +1534,70 @@ def create_story_template(
     )
 
     # --------------------------------------------------------
-    # CTA
+    # CTA (LLAMADA A LA ACCIÓN OPTIMIZADA)
     # --------------------------------------------------------
 
-    cta_box_w = 960
-    cta_box_h = 84
+    # Copy dinámico para evitar repetición
+    if product["is_on_demand"]:
+        cta_options = [
+            "💬 Respondé 'QUIERO' por DM para encargarlo",
+            "📲 Mandá 'QUIERO' por DM y te asesoramos",
+            "📦 Escribinos 'QUIERO' y lo traemos para vos",
+        ]
+    else:
+        cta_options = [
+            "⚡ Respondé 'QUIERO' y te pasamos el link",
+            "💬 Comentá 'QUIERO' por DM para comprar",
+            "📲 Mandá 'LINK' por DM y conseguilo hoy",
+            "🔥 Respondé 'QUIERO' para enviarte la oferta",
+        ]
 
-    cta_x1 = (
-        canvas_w - cta_box_w
-    ) // 2
+    cta_text = random.choice(cta_options)
 
-    cta_y1 = (
-        canvas_h - 220
+    # Dimensiones y resguardo de Safe Zone de Instagram (Subido a Y=1640)
+    cta_box_w = 940
+    cta_box_h = 92
+
+    cta_x1 = (canvas_w - cta_box_w) // 2
+    cta_y1 = canvas_h - 280  
+    cta_x2 = cta_x1 + cta_box_w
+    cta_y2 = cta_y1 + cta_box_h
+
+    # Glow exterior neón
+    cta_glow = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+    cta_glow_draw = ImageDraw.Draw(cta_glow)
+    
+    cta_glow_draw.rounded_rectangle(
+        (cta_x1 - 8, cta_y1 - 8, cta_x2 + 8, cta_y2 + 8),
+        radius=26,
+        fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 150),
     )
+    cta_glow = cta_glow.filter(ImageFilter.GaussianBlur(14))
+    bg.alpha_composite(cta_glow)
 
-    cta_x2 = (
-        cta_x1 + cta_box_w
-    )
-
-    cta_y2 = (
-        cta_y1 + cta_box_h
-    )
+    # Caja principal CTA
+    draw = ImageDraw.Draw(bg)
 
     draw.rounded_rectangle(
-        (
-            cta_x1,
-            cta_y1,
-            cta_x2,
-            cta_y2,
-        ),
-        radius=18,
-        fill=(15, 18, 25, 235),
+        (cta_x1, cta_y1, cta_x2, cta_y2),
+        radius=20,
+        fill=(10, 12, 18, 245),
         outline=accent_hex,
         width=3,
     )
 
-    # pequeña barra secundaria random
+    # Detalle de acento lateral
     draw.rounded_rectangle(
-        (
-            cta_x1 + 8,
-            cta_y1 + 8,
-            cta_x1 + 18,
-            cta_y2 - 8,
-        ),
-        radius=4,
+        (cta_x1 + 10, cta_y1 + 10, cta_x1 + 22, cta_y2 - 10),
+        radius=6,
         fill=secondary_hex,
     )
 
-    font_cta = get_font(27)
+    # Texto con tipografía ligeramente más grande
+    font_cta = get_font(30)
 
     draw.text(
-        (
-            canvas_w // 2,
-            (
-                cta_y1 + cta_y2
-            ) // 2,
-        ),
+        (canvas_w // 2, (cta_y1 + cta_y2) // 2),
         cta_text,
         fill="#FFFFFF",
         font=font_cta,
