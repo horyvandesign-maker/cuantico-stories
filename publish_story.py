@@ -1030,7 +1030,7 @@ def create_story_template(
 
     bg = background_source
 
-# --------------------------------------------------------
+    # --------------------------------------------------------
     # TEXTURA DE PUNTOS DE FONDO (VISIBLE)
     # --------------------------------------------------------
 
@@ -1596,6 +1596,28 @@ def create_story_template(
         anchor="mm",
     )
 
+    # --------------------------------------------------------
+    # BANNER CTA (RESPONDÉ INFO PARA COMPRAR)
+    # --------------------------------------------------------
+    cta_text = "💬 RESPONDÉ 'INFO' PARA COMPRAR"
+    cta_w, cta_h = 840, 90
+    cta_x1 = (1080 - cta_w) // 2
+    cta_y1 = 1620
+
+    draw.rectangle(
+        [cta_x1, cta_y1, cta_x1 + cta_w, cta_y1 + cta_h],
+        fill=(15, 15, 30, 240),
+        outline=(0, 240, 255),
+        width=3,
+    )
+    draw.text(
+        (540, cta_y1 + (cta_h // 2)),
+        cta_text,
+        fill="#00F0FF",
+        font=font_cta,
+        anchor="mm",
+    )
+    
     # --------------------------------------------------------
     # GUARDAR
     # --------------------------------------------------------
