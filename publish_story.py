@@ -634,13 +634,21 @@ def create_story_template(product, img_obj):
 
     draw = ImageDraw.Draw(bg)
 
-    # Marco de la tarjeta (width=6)
-    draw.rounded_rectangle(
-        (card_x - 5, card_y - 5, card_x + card_w + 5, card_y + card_h + 5),
-        radius=35,
-        outline=accent_hex,
-        width=60,
-    )
+    
+    
+# Marco de la tarjeta con grosor personalizado (ej: 25 píxeles)
+    grosor_deseado = 25
+    for i in range(grosor_deseado):
+        draw.rounded_rectangle(
+            (
+                card_x - 5 - i,
+                card_y - 5 - i,
+                card_x + card_w + 5 + i,
+                card_y + card_h + 5 + i,
+            ),
+            radius=35 + i,
+            outline=accent_hex,
+        )
 
     # Fondo Blanco Interno
     card_bg = Image.new("RGBA", (card_w, card_h), (255, 255, 255, 248))
