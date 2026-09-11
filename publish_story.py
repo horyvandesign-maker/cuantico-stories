@@ -1537,24 +1537,24 @@ def create_story_template(
     # CTA (LLAMADA A LA ACCIÓN OPTIMIZADA)
     # --------------------------------------------------------
 
-    # Copy dinámico para evitar repetición
+    # Copy dinámico limpio (sin emojis para evitar glifos rotos '□')
     if product["is_on_demand"]:
         cta_options = [
-            "💬 Respondé 'QUIERO' por DM para encargarlo",
-            "📲 Mandá 'QUIERO' por DM y te asesoramos",
-            "📦 Escribinos 'QUIERO' y lo traemos para vos",
+            "Respondé 'QUIERO' por DM para encargarlo",
+            "Mandá 'QUIERO' por DM y te asesoramos",
+            "Escribinos 'QUIERO' y lo traemos para vos",
         ]
     else:
         cta_options = [
-            "⚡ Respondé 'QUIERO' y te pasamos el link",
-            "💬 Comentá 'QUIERO' por DM para comprar",
-            "📲 Mandá 'LINK' por DM y conseguilo hoy",
-            "🔥 Respondé 'QUIERO' para enviarte la oferta",
+            "Respondé 'QUIERO' y te pasamos el link",
+            "Comentá 'QUIERO' por DM para comprar",
+            "Mandá 'LINK' por DM y conseguilo hoy",
+            "Respondé 'QUIERO' para enviarte la oferta",
         ]
 
     cta_text = random.choice(cta_options)
 
-    # Dimensiones y resguardo de Safe Zone de Instagram (Subido a Y=1640)
+    # Dimensiones y resguardo de Safe Zone
     cta_box_w = 940
     cta_box_h = 92
 
@@ -1563,7 +1563,7 @@ def create_story_template(
     cta_x2 = cta_x1 + cta_box_w
     cta_y2 = cta_y1 + cta_box_h
 
-    # Glow exterior neón
+    # Resplandor neón exterior
     cta_glow = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     cta_glow_draw = ImageDraw.Draw(cta_glow)
     
@@ -1575,7 +1575,7 @@ def create_story_template(
     cta_glow = cta_glow.filter(ImageFilter.GaussianBlur(14))
     bg.alpha_composite(cta_glow)
 
-    # Caja principal CTA
+    # Caja principal del CTA
     draw = ImageDraw.Draw(bg)
 
     draw.rounded_rectangle(
@@ -1586,14 +1586,7 @@ def create_story_template(
         width=3,
     )
 
-    # Detalle de acento lateral
-    draw.rounded_rectangle(
-        (cta_x1 + 10, cta_y1 + 10, cta_x1 + 22, cta_y2 - 10),
-        radius=6,
-        fill=secondary_hex,
-    )
-
-    # Texto con tipografía ligeramente más grande
+    # Texto perfectamente centrado
     font_cta = get_font(30)
 
     draw.text(
