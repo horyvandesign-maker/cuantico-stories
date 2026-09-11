@@ -564,7 +564,7 @@ def fetch_all_catalog_products():
 
 
 # ============================================================
-# CREACIÓN DE STORY (BORDES NEÓN ENGROSADOS GENERALES)
+# CREACIÓN DE STORY
 # ============================================================
 
 def create_story_template(product, img_obj):
@@ -615,34 +615,15 @@ def create_story_template(product, img_obj):
     bg.alpha_composite(tech_layer)
 
     # --------------------------------------------------------
-    # 1. TARJETA DE PRODUCTO (BORDE ENGROSADO width=6)
+    # 1. TARJETA DE PRODUCTO (CON EFECTO NEÓN Y FONDO BLANCO)
     # --------------------------------------------------------
     card_w, card_h = random.randint(825, 865), random.randint(825, 865)
     card_x = (canvas_w - card_w) // 2
     card_y = random.randint(405, 435)
 
-    # Glow Neón Tarjeta
-    card_glow = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
-    cg_draw = ImageDraw.Draw(card_glow)
-    cg_draw.rounded_rectangle(
-        (card_x - 15, card_y - 15, card_x + card_w + 15, card_y + card_h + 15),
-        radius=45,
-        fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 170),
-    )
-    card_glow = card_glow.filter(ImageFilter.GaussianBlur(20))
-    bg.alpha_composite(card_glow)
-
-    draw = ImageDraw.Draw(bg)
-
-    
-    
-# --------------------------------------------------------
-    # EFECTO NEÓN DIFUMINADO PARA LA TARJETA
-    # --------------------------------------------------------
+    # Halo de neón difuso (por detrás de la tarjeta)
     neon_glow = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     ng_draw = ImageDraw.Draw(neon_glow)
-
-    # Capas progresivas para crear el halo de luz difuso en ambos lados
     for offset in range(35, 0, -6):
         alpha = int(15 + (35 - offset) * 3)
         ng_draw.rounded_rectangle(
@@ -656,35 +637,30 @@ def create_story_template(product, img_obj):
             outline=(accent_rgb[0], accent_rgb[1], accent_rgb[2], alpha),
             width=4,
         )
-
-    # Aplicamos difuminado gaussiano para fundir el brillo con el fondo
     neon_glow = neon_glow.filter(ImageFilter.GaussianBlur(14))
     bg.alpha_composite(neon_glow)
 
-    draw = ImageDraw.Draw(bg)
+    # Fondo Blanco Interno de la tarjeta
+    card_bg = Image.new("RGBA", (card_w, card_h), (255, 255, 255, 248))
+    card_mask = Image.new("L", (card_w, card_h), 0)
+    card_mask_draw = ImageDraw.Draw(card_mask)
+    card_mask_draw.rounded_rectangle((0, 0, card_w - 1, card_h - 1), radius=30, fill=255)
+    bg.paste(card_bg, (card_x, card_y), card_mask)
 
-    # Marco principal de color de acento
+    # Líneas sólidas del borde (por encima del fondo blanco)
+    draw = ImageDraw.Draw(bg)
     draw.rounded_rectangle(
         (card_x, card_y, card_x + card_w, card_y + card_h),
         radius=35,
         outline=accent_hex,
         width=5,
     )
-
-    # Núcleo blanco interior (opcional, le da el toque realista de tubo de gas neón)
     draw.rounded_rectangle(
         (card_x + 3, card_y + 3, card_x + card_w - 3, card_y + card_h - 3),
         radius=32,
         outline="#FFFFFF",
         width=1,
     )
-
-    # Fondo Blanco Interno
-    card_bg = Image.new("RGBA", (card_w, card_h), (255, 255, 255, 248))
-    card_mask = Image.new("L", (card_w, card_h), 0)
-    card_mask_draw = ImageDraw.Draw(card_mask)
-    card_mask_draw.rounded_rectangle((0, 0, card_w - 1, card_h - 1), radius=30, fill=255)
-    bg.paste(card_bg, (card_x, card_y), card_mask)
 
     # Producto
     img_copy = img_obj.copy().convert("RGBA")
@@ -722,7 +698,7 @@ def create_story_template(product, img_obj):
     draw.multiline_text((canvas_w // 2, title_y), wrapped_text, fill="#FFFFFF", font=font_title, anchor="mm", align="center", spacing=8)
 
     # --------------------------------------------------------
-    # 2. BADGE PRECIO / ENCARGUE (BORDE ENGROSADO width=6)
+    # 2. BADGE PRECIO / ENCARGUE
     # --------------------------------------------------------
     display_label = ">> PRODUCTO POR ENCARGUE <<" if product["is_on_demand"] else product["price"]
     badge_font_size = 34 if product["is_on_demand"] else 54
@@ -753,7 +729,7 @@ def create_story_template(product, img_obj):
     draw.text(((badge_x1 + badge_x2) // 2, (badge_y1 + badge_y2) // 2 - 2), display_label, fill=accent_hex, font=font_badge, anchor="mm")
 
     # --------------------------------------------------------
-    # 3. CAJA CTA (BORDE ENGROSADO width=6)
+    # 3. CAJA CTA
     # --------------------------------------------------------
     if product["is_on_demand"]:
         cta_options = [
@@ -782,7 +758,7 @@ def create_story_template(product, img_obj):
     cta_glow = cta_glow.filter(ImageFilter.GaussianBlur(18))
     bg.alpha_composite(cta_glow)
 
-    # Caja CTA (width=6)
+    # Caja CTA
     draw = ImageDraw.Draw(bg)
     draw.rounded_rectangle(
         (cta_x1, cta_y1, cta_x2, cta_y2),
