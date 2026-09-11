@@ -448,7 +448,7 @@ def create_random_tech_layer(canvas_w, canvas_h, accent_rgb, secondary_rgb):
 
 def generate_ai_title(original_title, permalink=""):
     if not GEMINI_API_KEY:
-        return original_title
+        return original_title.upper()
 
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
@@ -471,11 +471,11 @@ def generate_ai_title(original_title, permalink=""):
         )
         ai_text = clean_text(response.text)
         if len(ai_text) > 3:
-            return ai_text
+            return ai_text.upper()
     except Exception as error:
         print(f"Fallback título original: {error}")
 
-    return original_title
+    return original_title.upper()
 
 
 def fetch_all_catalog_products():
@@ -687,9 +687,9 @@ def create_story_template(product, img_obj):
     else:
         draw.text((canvas_w // 2, 190), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
 
-    # Título
+    # Título (En Mayúsculas)
     font_title = get_font(42)
-    ai_name = product.get("ai_name", product["original_name"])
+    ai_name = product.get("ai_name", product["original_name"]).upper()
     wrapped_lines = textwrap.wrap(ai_name, width=22)
     wrapped_text = "\n".join(wrapped_lines[:2])
     title_y = card_y + card_h + 78
