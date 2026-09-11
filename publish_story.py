@@ -636,19 +636,48 @@ def create_story_template(product, img_obj):
 
     
     
-# Marco de la tarjeta con grosor personalizado (ej: 25 píxeles)
-    grosor_deseado = 25
-    for i in range(grosor_deseado):
-        draw.rounded_rectangle(
+# --------------------------------------------------------
+    # EFECTO NEÓN DIFUMINADO PARA LA TARJETA
+    # --------------------------------------------------------
+    neon_glow = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+    ng_draw = ImageDraw.Draw(neon_glow)
+
+    # Capas progresivas para crear el halo de luz difuso en ambos lados
+    for offset in range(35, 0, -6):
+        alpha = int(15 + (35 - offset) * 3)
+        ng_draw.rounded_rectangle(
             (
-                card_x - 5 - i,
-                card_y - 5 - i,
-                card_x + card_w + 5 + i,
-                card_y + card_h + 5 + i,
+                card_x - offset,
+                card_y - offset,
+                card_x + card_w + offset,
+                card_y + card_h + offset,
             ),
-            radius=35 + i,
-            outline=accent_hex,
+            radius=35 + (offset // 2),
+            outline=(accent_rgb[0], accent_rgb[1], accent_rgb[2], alpha),
+            width=4,
         )
+
+    # Aplicamos difuminado gaussiano para fundir el brillo con el fondo
+    neon_glow = neon_glow.filter(ImageFilter.GaussianBlur(14))
+    bg.alpha_composite(neon_glow)
+
+    draw = ImageDraw.Draw(bg)
+
+    # Marco principal de color de acento
+    draw.rounded_rectangle(
+        (card_x, card_y, card_x + card_w, card_y + card_h),
+        radius=35,
+        outline=accent_hex,
+        width=5,
+    )
+
+    # Núcleo blanco interior (opcional, le da el toque realista de tubo de gas neón)
+    draw.rounded_rectangle(
+        (card_x + 3, card_y + 3, card_x + card_w - 3, card_y + card_h - 3),
+        radius=32,
+        outline="#FFFFFF",
+        width=1,
+    )
 
     # Fondo Blanco Interno
     card_bg = Image.new("RGBA", (card_w, card_h), (255, 255, 255, 248))
