@@ -564,13 +564,13 @@ def fetch_all_catalog_products():
 
 
 # ============================================================
-# CREACIÓN DE STORY (TÍTULO ARRIBA, BORDES GRUESOS Y NEÓN POTENCIADO)
+# CREACIÓN DE STORY (BORDES NEÓN ENGROSADOS GENERALES)
 # ============================================================
 
 def create_story_template(product, img_obj):
-    canvas_w = 1080
-    canvas_h = 1920
+    canvas_w, canvas_h = 1080, 1920
 
+    # Colors
     accent_hex = get_next_accent()
     secondary_hex = random_secondary_color(accent_hex)
     accent_rgb = hex_to_rgb(accent_hex)
@@ -578,7 +578,7 @@ def create_story_template(product, img_obj):
 
     print(f"Story {product['id']} color={accent_hex} secundario={secondary_hex}")
 
-    # Fondo base con blur y oscuridad (mantenemos exactamente el generador actual)
+    # Background
     background_source = img_obj.convert("RGB").resize((canvas_w, canvas_h))
     background_source = background_source.filter(ImageFilter.GaussianBlur(random.randint(65, 95))).convert("RGBA")
 
@@ -591,7 +591,7 @@ def create_story_template(product, img_obj):
     background_source.alpha_composite(dark_overlay)
     bg = background_source
 
-    # Textura de Puntos de fondo
+    # Textura de Puntos
     texture_layer = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     tex_draw = ImageDraw.Draw(texture_layer)
     for x in range(0, canvas_w, 35):
@@ -599,7 +599,7 @@ def create_story_template(product, img_obj):
             tex_draw.ellipse((x, y, x + 2, y + 2), fill=(255, 255, 255, 55))
     bg.alpha_composite(texture_layer)
 
-    # Halo general atmosférico
+    # Atmospheric Glow
     atmospheric_glow = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     glow_draw = ImageDraw.Draw(atmospheric_glow)
     glow_x, glow_y, glow_radius = random.randint(250, 830), random.randint(600, 1250), random.randint(350, 550)
@@ -610,102 +610,48 @@ def create_story_template(product, img_obj):
     atmospheric_glow = atmospheric_glow.filter(ImageFilter.GaussianBlur(130))
     bg.alpha_composite(atmospheric_glow)
 
-    # Decoración Tech
+    # Tech Layer
     tech_layer = create_random_tech_layer(canvas_w, canvas_h, accent_rgb, secondary_rgb)
     bg.alpha_composite(tech_layer)
 
-    draw = ImageDraw.Draw(bg)
-
     # --------------------------------------------------------
-    # LOGO (Arriba de todo)
+    # 1. TARJETA DE PRODUCTO (BORDE ENGROSADO width=6)
     # --------------------------------------------------------
-    logo_path = os.path.join(os.path.dirname(__file__), "logo_canva.png")
-    logo_h_space = 140
-    has_logo = False
-    if os.path.exists(logo_path):
-        try:
-            logo_img = Image.open(logo_path).convert("RGBA")
-            logo_img.thumbnail((450, 150), Image.Resampling.LANCZOS)
-            logo_w, logo_h = logo_img.size
-            bg.paste(logo_img, ((canvas_w - logo_w) // 2, 90), logo_img)
-            logo_h_space = 90 + logo_h + 25
-            has_logo = True
-        except Exception as error:
-            print(f"Error logo: {error}")
-
-    if not has_logo:
-        draw.text((canvas_w // 2, 120), "CUANTICO PC", fill="#FFFFFF", font=get_font(45), anchor="mm")
-        logo_h_space = 160
-
-    # --------------------------------------------------------
-    # TÍTULO (Arriba, debajo del logo)
-    # --------------------------------------------------------
-    font_title = get_font(44)
-    ai_name = product.get("ai_name", product["original_name"])
-    wrapped_lines = textwrap.wrap(ai_name, width=22)
-    wrapped_text = "\n".join(wrapped_lines[:2])
-    title_y = logo_h_space + 10
-
-    # Sombra del título
-    draw.multiline_text(
-        (canvas_w // 2 + 3, title_y + 3),
-        wrapped_text,
-        fill=(0, 0, 0, 220),
-        font=font_title,
-        anchor="mm",
-        align="center",
-        spacing=8,
-    )
-    # Texto principal del título
-    draw.multiline_text(
-        (canvas_w // 2, title_y),
-        wrapped_text,
-        fill="#FFFFFF",
-        font=font_title,
-        anchor="mm",
-        align="center",
-        spacing=8,
-    )
-
-    # --------------------------------------------------------
-    # TARJETA DEL PRODUCTO
-    # --------------------------------------------------------
-    card_w = 840
-    card_h = 840
+    card_w, card_h = random.randint(825, 865), random.randint(825, 865)
     card_x = (canvas_w - card_w) // 2
-    card_y = title_y + (len(wrapped_lines[:2]) * 55) + 35
+    card_y = random.randint(405, 435)
 
-    # Glow neón para la tarjeta
+    # Glow Neón Tarjeta
     card_glow = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     cg_draw = ImageDraw.Draw(card_glow)
     cg_draw.rounded_rectangle(
-        (card_x - 18, card_y - 18, card_x + card_w + 18, card_y + card_h + 18),
+        (card_x - 15, card_y - 15, card_x + card_w + 15, card_y + card_h + 15),
         radius=45,
-        fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 180),
+        fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 170),
     )
-    card_glow = card_glow.filter(ImageFilter.GaussianBlur(22))
+    card_glow = card_glow.filter(ImageFilter.GaussianBlur(20))
     bg.alpha_composite(card_glow)
 
     draw = ImageDraw.Draw(bg)
 
-    # Marco tarjeta con borde extra grueso (width=7)
+    # Marco de la tarjeta (width=6)
     draw.rounded_rectangle(
         (card_x - 5, card_y - 5, card_x + card_w + 5, card_y + card_h + 5),
         radius=35,
         outline=accent_hex,
-        width=7,
+        width=6,
     )
 
-    # Fondo blanco interno
+    # Fondo Blanco Interno
     card_bg = Image.new("RGBA", (card_w, card_h), (255, 255, 255, 248))
     card_mask = Image.new("L", (card_w, card_h), 0)
     card_mask_draw = ImageDraw.Draw(card_mask)
     card_mask_draw.rounded_rectangle((0, 0, card_w - 1, card_h - 1), radius=30, fill=255)
     bg.paste(card_bg, (card_x, card_y), card_mask)
 
-    # Imagen del producto
+    # Producto
     img_copy = img_obj.copy().convert("RGBA")
-    max_product_size = 680
+    max_product_size = random.randint(700, 760)
     img_copy.thumbnail((max_product_size, max_product_size), Image.Resampling.LANCZOS)
     product_w, product_h = img_copy.size
     product_x = card_x + (card_w - product_w) // 2
@@ -714,72 +660,63 @@ def create_story_template(product, img_obj):
 
     draw = ImageDraw.Draw(bg)
 
+    # Logo
+    logo_path = os.path.join(os.path.dirname(__file__), "logo_canva.png")
+    if os.path.exists(logo_path):
+        try:
+            logo_img = Image.open(logo_path).convert("RGBA")
+            logo_img.thumbnail((550, 190), Image.Resampling.LANCZOS)
+            logo_w, logo_h = logo_img.size
+            bg.paste(logo_img, ((canvas_w - logo_w) // 2, 145), logo_img)
+        except Exception as error:
+            print(f"Error logo: {error}")
+            draw.text((canvas_w // 2, 190), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
+    else:
+        draw.text((canvas_w // 2, 190), "CUANTICO PC", fill="#FFFFFF", font=get_font(50), anchor="mm")
+
+    # Título
+    font_title = get_font(42)
+    ai_name = product.get("ai_name", product["original_name"])
+    wrapped_lines = textwrap.wrap(ai_name, width=22)
+    wrapped_text = "\n".join(wrapped_lines[:2])
+    title_y = card_y + card_h + 78
+
+    draw.multiline_text((canvas_w // 2 + 3, title_y + 3), wrapped_text, fill=(0, 0, 0, 200), font=font_title, anchor="mm", align="center", spacing=8)
+    draw.multiline_text((canvas_w // 2, title_y), wrapped_text, fill="#FFFFFF", font=font_title, anchor="mm", align="center", spacing=8)
+
     # --------------------------------------------------------
-    # BADGE PRECIO / ENCARGUE (Solapado abajo de la tarjeta)
-    # Reborde curvo para por encargue, poligonal para precio
+    # 2. BADGE PRECIO / ENCARGUE (BORDE ENGROSADO width=6)
     # --------------------------------------------------------
     display_label = ">> PRODUCTO POR ENCARGUE <<" if product["is_on_demand"] else product["price"]
-    badge_font_size = 32 if product["is_on_demand"] else 46
+    badge_font_size = 34 if product["is_on_demand"] else 54
     font_badge = get_font(badge_font_size)
 
     bbox = draw.textbbox((0, 0), display_label, font=font_badge)
     text_w, text_h = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    badge_w = min(text_w + 90, 920)
-    badge_h = text_h + 44
-
+    badge_w, badge_h = min(text_w + 100, 980), text_h + 48
     badge_x1 = (canvas_w - badge_w) // 2
-    badge_y1 = card_y + card_h - (badge_h // 2)
-    badge_x2 = badge_x1 + badge_w
-    badge_y2 = badge_y1 + badge_h
+    badge_y1 = title_y + 90
+    badge_x2, badge_y2 = badge_x1 + badge_w, badge_y1 + badge_h
 
-    # Glow badge
+    # Glow Neón Badge
     badge_glow = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     bgd = ImageDraw.Draw(badge_glow)
-    bgd.rounded_rectangle(
-        (badge_x1 - 8, badge_y1 - 8, badge_x2 + 8, badge_y2 + 8),
-        radius=22,
-        fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 170),
-    )
+    bgd.rounded_rectangle((badge_x1 - 8, badge_y1 - 8, badge_x2 + 8, badge_y2 + 8), radius=26, fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 160))
     badge_glow = badge_glow.filter(ImageFilter.GaussianBlur(16))
     bg.alpha_composite(badge_glow)
 
     draw = ImageDraw.Draw(bg)
-
-    if product["is_on_demand"]:
-        # Reborde CURVO (rounded rectangle) para productos por encargue
-        draw.rounded_rectangle(
-            (badge_x1, badge_y1, badge_x2, badge_y2),
-            radius=22,
-            fill=(10, 12, 18, 245),
-            outline=accent_hex,
-            width=6,
-        )
-    else:
-        # Reborde POLIGONAL (esquinas cortadas) para productos con precio
-        cut = 18
-        poly_points = [
-            (badge_x1 + cut, badge_y1),
-            (badge_x2 - cut, badge_y1),
-            (badge_x2, badge_y1 + cut),
-            (badge_x2, badge_y2 - cut),
-            (badge_x2 - cut, badge_y2),
-            (badge_x1 + cut, badge_y2),
-            (badge_x1, badge_y2 - cut),
-            (badge_x1, badge_y1 + cut),
-        ]
-        draw.polygon(poly_points, fill=(10, 12, 18, 245))
-        draw.line(poly_points + [poly_points[0]], fill=accent_hex, width=6, joint="curve")
-
-    draw.text(
-        ((badge_x1 + badge_x2) // 2, (badge_y1 + badge_y2) // 2 - 2),
-        display_label,
-        fill=accent_hex,
-        font=font_badge,
-        anchor="mm",
+    draw.rounded_rectangle(
+        (badge_x1, badge_y1, badge_x2, badge_y2),
+        radius=20,
+        fill=(10, 12, 18, 240),
+        outline=accent_hex,
+        width=6,
     )
+    draw.text(((badge_x1 + badge_x2) // 2, (badge_y1 + badge_y2) // 2 - 2), display_label, fill=accent_hex, font=font_badge, anchor="mm")
 
     # --------------------------------------------------------
-    # CTA (LLAMADA A LA ACCIÓN INFERIOR - Borde ancho width=6)
+    # 3. CAJA CTA (BORDE ENGROSADO width=6)
     # --------------------------------------------------------
     if product["is_on_demand"]:
         cta_options = [
@@ -789,32 +726,26 @@ def create_story_template(product, img_obj):
         ]
     else:
         cta_options = [
-            "Respondé 'INFO' para comprar",
+            "Respondé 'QUIERO' y te pasamos el link",
             "Comentá 'QUIERO' por DM para comprar",
             "Mandá 'LINK' por DM y conseguilo hoy",
-            "Respondé 'INFO' para enviarte la oferta",
+            "Respondé 'QUIERO' para enviarte la oferta",
         ]
 
     cta_text = random.choice(cta_options)
-
-    cta_box_w = 940
-    cta_box_h = 92
+    cta_box_w, cta_box_h = 940, 92
     cta_x1 = (canvas_w - cta_box_w) // 2
-    cta_y1 = canvas_h - 260
-    cta_x2 = cta_x1 + cta_box_w
-    cta_y2 = cta_y1 + cta_box_h
+    cta_y1 = canvas_h - 280
+    cta_x2, cta_y2 = cta_x1 + cta_box_w, cta_y1 + cta_box_h
 
-    # Glow neón CTA
+    # Glow Neón CTA
     cta_glow = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     cta_glow_draw = ImageDraw.Draw(cta_glow)
-    cta_glow_draw.rounded_rectangle(
-        (cta_x1 - 12, cta_y1 - 12, cta_x2 + 12, cta_y2 + 12),
-        radius=28,
-        fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 180),
-    )
+    cta_glow_draw.rounded_rectangle((cta_x1 - 12, cta_y1 - 12, cta_x2 + 12, cta_y2 + 12), radius=28, fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 180))
     cta_glow = cta_glow.filter(ImageFilter.GaussianBlur(18))
     bg.alpha_composite(cta_glow)
 
+    # Caja CTA (width=6)
     draw = ImageDraw.Draw(bg)
     draw.rounded_rectangle(
         (cta_x1, cta_y1, cta_x2, cta_y2),
@@ -825,13 +756,7 @@ def create_story_template(product, img_obj):
     )
 
     font_cta = get_font(30)
-    draw.text(
-        (canvas_w // 2, (cta_y1 + cta_y2) // 2),
-        cta_text,
-        fill="#FFFFFF",
-        font=font_cta,
-        anchor="mm",
-    )
+    draw.text(((canvas_w // 2), (cta_y1 + cta_y2) // 2), cta_text, fill="#FFFFFF", font=font_cta, anchor="mm")
 
     # Guardar
     output_path = f"story_{product['id']}.jpg"
@@ -841,7 +766,7 @@ def create_story_template(product, img_obj):
 
 
 # ============================================================
-# SUBIDA TEMPORAL DE IMAGEN
+# SUBIDA TEMPORAL DE IMAGEN Y META / INSTAGRAM API
 # ============================================================
 
 def upload_local_image_to_web(local_filepath):
@@ -872,10 +797,6 @@ def upload_local_image_to_web(local_filepath):
 
     return None
 
-
-# ============================================================
-# INSTAGRAM
-# ============================================================
 
 def wait_for_container(container_id, timeout_seconds=60):
     status_url = f"https://graph.facebook.com/{META_API_VERSION}/{container_id}"
