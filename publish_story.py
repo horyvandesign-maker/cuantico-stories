@@ -1412,204 +1412,43 @@ def create_story_template(
         spacing=8,
     )
 
+# --------------------------------------------------------
+    # BADGE DE PRECIO / ESTADO
     # --------------------------------------------------------
-    # BADGE PRECIO / ENCARGUE
-    # --------------------------------------------------------
-
-    if product["is_on_demand"]:
-        badge_font_size = 34
-    else:
-        badge_font_size = 54
-
-    font_badge = get_font(
-        badge_font_size
+    price_text = product["price"] if not product["is_on_demand"] else ">> PRODUCTO POR ENCARGUE <<"
+    
+    # Dibujar la caja de precio/encargue
+    draw.rectangle(
+        [180, 1380, 900, 1470],
+        fill=(20, 20, 30, 220),
+        outline="#FF007F",  # Borde rosa neón
+        width=2,
     )
-
-    bbox = draw.textbbox(
-        (0, 0),
-        display_label,
-        font=font_badge,
-    )
-
-    text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
-
-    badge_w = min(
-        text_w + 100,
-        980,
-    )
-
-    badge_h = text_h + 48
-
-    badge_x1 = (
-        canvas_w - badge_w
-    ) // 2
-
-    badge_y1 = (
-        title_y + 90
-    )
-
-    badge_x2 = (
-        badge_x1 + badge_w
-    )
-
-    badge_y2 = (
-        badge_y1 + badge_h
-    )
-
-    # glow badge
-    badge_glow = Image.new(
-        "RGBA",
-        (canvas_w, canvas_h),
-        (0, 0, 0, 0),
-    )
-
-    bgd = ImageDraw.Draw(
-        badge_glow
-    )
-
-    bgd.rounded_rectangle(
-        (
-            badge_x1 - 5,
-            badge_y1 - 5,
-            badge_x2 + 5,
-            badge_y2 + 5,
-        ),
-        radius=26,
-        fill=(
-            accent_rgb[0],
-            accent_rgb[1],
-            accent_rgb[2],
-            150,
-        ),
-    )
-
-    badge_glow = badge_glow.filter(
-        ImageFilter.GaussianBlur(18)
-    )
-
-    bg.alpha_composite(
-        badge_glow
-    )
-
-    draw = ImageDraw.Draw(bg)
-
-    draw.rounded_rectangle(
-        (
-            badge_x1 - 2,
-            badge_y1 - 2,
-            badge_x2 + 2,
-            badge_y2 + 2,
-        ),
-        radius=22,
-        fill=accent_rgb,
-    )
-
-    draw.rounded_rectangle(
-        (
-            badge_x1,
-            badge_y1,
-            badge_x2,
-            badge_y2,
-        ),
-        radius=20,
-        fill=(12, 14, 20, 255),
-    )
-
     draw.text(
-        (
-            (
-                badge_x1
-                + badge_x2
-            ) // 2,
-            (
-                badge_y1
-                + badge_y2
-            ) // 2 - 2,
-        ),
-        display_label,
-        fill=accent_hex,
-        font=font_badge,
+        (540, 1425),
+        price_text,
+        fill="#FF007F",
+        font=font_price,
         anchor="mm",
     )
 
     # --------------------------------------------------------
-    # CTA
-    # --------------------------------------------------------
-
-    cta_box_w = 960
-    cta_box_h = 84
-
-    cta_x1 = (
-        canvas_w - cta_box_w
-    ) // 2
-
-    cta_y1 = (
-        canvas_h - 220
-    )
-
-    cta_x2 = (
-        cta_x1 + cta_box_w
-    )
-
-    cta_y2 = (
-        cta_y1 + cta_box_h
-    )
-
-    draw.rounded_rectangle(
-        (
-            cta_x1,
-            cta_y1,
-            cta_x2,
-            cta_y2,
-        ),
-        radius=18,
-        fill=(15, 18, 25, 235),
-        outline=accent_hex,
-        width=3,
-    )
-
-    # pequeña barra secundaria random
-    draw.rounded_rectangle(
-        (
-            cta_x1 + 8,
-            cta_y1 + 8,
-            cta_x1 + 18,
-            cta_y2 - 8,
-        ),
-        radius=4,
-        fill=secondary_hex,
-    )
-
-    font_cta = get_font(27)
-
-    draw.text(
-        (
-            canvas_w // 2,
-            (
-                cta_y1 + cta_y2
-            ) // 2,
-        ),
-        cta_text,
-        fill="#FFFFFF",
-        font=font_cta,
-        anchor="mm",
-    )
-
-    # --------------------------------------------------------
-    # BANNER CTA (RESPONDÉ INFO PARA COMPRAR)
+    # BANNER ÚNICO CTA (RESPONDÉ 'INFO' PARA COMPRAR)
     # --------------------------------------------------------
     cta_text = "💬 RESPONDÉ 'INFO' PARA COMPRAR"
-    cta_w, cta_h = 840, 90
+    cta_w, cta_h = 840, 110
     cta_x1 = (1080 - cta_w) // 2
-    cta_y1 = 1620
+    cta_y1 = 1580
 
+    # Fondo oscuro con borde neón cian
     draw.rectangle(
         [cta_x1, cta_y1, cta_x1 + cta_w, cta_y1 + cta_h],
-        fill=(15, 15, 30, 240),
-        outline=(0, 240, 255),
-        width=3,
+        fill=(10, 15, 25, 245),
+        outline="#00F0FF",
+        width=4,
     )
+
+    # Texto cian centrado
     draw.text(
         (540, cta_y1 + (cta_h // 2)),
         cta_text,
@@ -1617,17 +1456,12 @@ def create_story_template(
         font=font_cta,
         anchor="mm",
     )
-    
+
     # --------------------------------------------------------
     # GUARDAR
     # --------------------------------------------------------
-
-    output_path = (
-        f"story_{product['id']}.jpg"
-    )
-
+    output_path = f"story_{product['id']}.jpg"
     final_image = bg.convert("RGB")
-
     final_image.save(
         output_path,
         "JPEG",
