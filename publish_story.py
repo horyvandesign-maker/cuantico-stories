@@ -853,6 +853,7 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
 
     cyan_neon = (0, 245, 255)
     magenta_neon = (255, 0, 150)
+    pink_neon = (255, 50, 180)
     purple_glow = (180, 0, 255)
     white = (255, 255, 255)
 
@@ -893,7 +894,7 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
 
     # 3. Título "PCS GAMER" Centrado Verticalmente entre las fotos
     title_text = "PCS GAMER"
-    bbox = draw.textbbox((0, 0), title_text, font=font_title)
+    bbox = draw.textbbox((0, 0), title_text, font=font_title, fill=pink_neon)
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
 
