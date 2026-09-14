@@ -773,6 +773,121 @@ def create_story_template(product, img_obj):
     final_image.save(output_path, "JPEG", quality=95, optimize=True)
     return output_path
 
+# ============================================================
+# PLANTILLAS DE CAMPAÑA INSTITUCIONAL
+# ============================================================
+
+def generate_pcs_gamer_campaign(top_img_path, bottom_img_path, output_path="pcs_gamer_story.jpg"):
+    W, H = 1080, 1920
+    bg_color = (11, 10, 21)
+    img = Image.new("RGBA", (W, H), bg_color)
+    draw = ImageDraw.Draw(img)
+
+    cyan_neon = (0, 243, 255)
+    magenta_neon = (255, 0, 128)
+    white = (255, 255, 255)
+    soft_cyan = (180, 245, 255)
+
+    font_title = get_font(85)
+    font_body = get_font(34)
+    font_footer = get_font(30)
+
+    def paste_cropped_image(canvas, image_path, box_coords):
+        x1, y1, x2, y2 = box_coords
+        box_w, box_h = x2 - x1, y2 - y1
+        if os.path.exists(image_path):
+            with Image.open(image_path) as input_img:
+                input_img = input_img.convert("RGBA")
+                img_w, img_h = input_img.size
+                ratio = max(box_w / img_w, box_h / img_h)
+                new_size = (int(img_w * ratio), int(img_h * ratio))
+                resized = input_img.resize(new_size, Image.Resampling.LANCZOS)
+                
+                left = (resized.width - box_w) // 2
+                top = (resized.height - box_h) // 2
+                cropped = resized.crop((left, top, left + box_w, top + box_h))
+                canvas.paste(cropped, (x1, y1))
+
+    # 1. Cajas de imagen superior e inferior
+    top_box = (90, 80, 990, 580)
+    paste_cropped_image(img, top_img_path, top_box)
+    draw.rounded_rectangle(top_box, radius=12, outline=cyan_neon, width=6)
+
+    bottom_box = (90, 820, 990, 1320)
+    paste_cropped_image(img, bottom_img_path, bottom_box)
+    draw.rounded_rectangle(bottom_box, radius=12, outline=cyan_neon, width=6)
+
+    # 2. Título Central
+    title_text = "PCS GAMER"
+    bbox = draw.textbbox((0, 0), title_text, font=font_title)
+    title_x = (W - (bbox[2] - bbox[0])) // 2
+    title_y = 660
+
+    glow_img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    glow_draw = ImageDraw.Draw(glow_img)
+    for offset in range(1, 8):
+        glow_draw.text((title_x, title_y), title_text, font=font_title, fill=magenta_neon)
+    glow_img = glow_img.filter(ImageFilter.GaussianBlur(6))
+    img.alpha_composite(glow_img)
+    draw.text((title_x, title_y), title_text, font=font_title, fill=white)
+
+    # 3. Beneficios
+    bullets = [
+        "💳  HASTA 12 CUOTAS CON TARJETAS",
+        "📦  ENVÍOS A TODO EL PAÍS",
+        "🛒  COMPRÁ POR MERCADOLIBRE"
+    ]
+    for i, line in enumerate(bullets):
+        draw.text((100, 1380 + (i * 52)), line, font=font_body, fill=white)
+
+    # 4. Textos finales
+    draw.text((W // 2, 1580), "ESCRIBINOS Y TE ASESORAMOS SIN COMPROMISO.", font=font_body, fill=soft_cyan, anchor="mm")
+    draw.text((W // 2, 1690), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", font=font_footer, fill=white, anchor="mm")
+    draw.text((W // 2, 1740), "@CUANTICOPC", font=font_title, fill=cyan_neon, anchor="mm")
+
+    img.convert("RGB").save(output_path, quality=95)
+    return output_path
+
+def generate_branding_campaign(output_path="branding_story.jpg"):
+    W, H = 1080, 1920
+    img = Image.new("RGBA", (W, H), (8, 12, 28))
+    draw = ImageDraw.Draw(img)
+
+    cyan_neon = (0, 245, 212)
+    white = (255, 255, 255)
+    soft_blue = (180, 210, 255)
+
+    draw.line([(800, 0), (800, 180), (1000, 300)], fill=(0, 245, 212, 130), width=3)
+    draw.ellipse((995, 295, 1005, 305), fill=cyan_neon)
+    draw.line([(80, 1150), (80, 1500), (320, 1750)], fill=(0, 245, 212, 130), width=3)
+    draw.ellipse((315, 1745, 325, 1755), fill=cyan_neon)
+
+    logo_path = os.path.join(os.path.dirname(__file__), "logo_canva.png")
+    if os.path.exists(logo_path):
+        try:
+            logo_img = Image.open(logo_path).convert("RGBA")
+            logo_img.thumbnail((500, 180), Image.Resampling.LANCZOS)
+            img.paste(logo_img, ((W - logo_img.width) // 2, 150), logo_img)
+        except Exception:
+            draw.text((W // 2, 200), "CUANTICO PC", fill=white, font=get_font(50), anchor="mm")
+
+    font_title = get_font(56)
+    draw.text((100, 420), "TU TECNOLOGÍA", fill=white, font=font_title)
+    draw.text((100, 490), "NUESTRA EXPERIENCIA", fill=white, font=font_title)
+
+    font_sub = get_font(32)
+    for i, item in enumerate(["💻   Notebooks", "🖥️   PCs Gamer y Oficina", "🌐   Redes y Conectividad", "🎧   Accesorios"]):
+        draw.text((100, 620 + (i * 55)), item, fill=soft_blue, font=font_sub)
+
+    draw.text((100, 960), "VENTA ONLINE Y PRESENCIAL", fill=cyan_neon, font=get_font(34))
+    for i, item in enumerate(["🛒   MercadoLibre", "🚚   Envíos a todo el país", "💵   Descuentos en efectivo"]):
+        draw.text((100, 1040 + (i * 55)), item, fill=white, font=font_sub)
+
+    draw.text((W // 2, 1680), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", fill=white, font=get_font(28), anchor="mm")
+    draw.text((W // 2, 1730), "@CUANTICOPC", fill=cyan_neon, font=get_font(38), anchor="mm")
+
+    img.convert("RGB").save(output_path, quality=95)
+    return output_path
 
 # ============================================================
 # SUBIDA TEMPORAL DE IMAGEN Y META / INSTAGRAM API
@@ -913,24 +1028,59 @@ def process_catalog(auto_approve=False):
             parse_mode="HTML",
         )
 
-    for index, product in enumerate(products, start=1):
+for index, product in enumerate(products, start=1):
         image_path = None
         try:
-            image_response = requests.get(product["raw_url"], headers=headers, timeout=20)
-            if image_response.status_code != 200:
-                print(f"[{index}/{total}] No se pudo descargar imagen.")
-                continue
+            # 1. Definimos las probabilidades: 70% Producto normal, 15% PCs Gamer, 15% Branding
+            tipo_publicacion = random.choices(
+                ["producto", "pcs_gamer", "branding"], 
+                weights=[70, 15, 15]
+            )[0]
 
-            img_obj = Image.open(BytesIO(image_response.content)).convert("RGBA")
+            if tipo_publicacion == "pcs_gamer":
+                print(f"[{index}/{total}] Generando placa especial: PCs Gamer")
+                # IMPORTANTE: Asegurate de tener estas dos imágenes en la misma carpeta del script
+                # o actualizá las rutas si las tenés en una subcarpeta (ej. 'assets/headphones.jpg')
+                image_path = generate_pcs_gamer_campaign(
+                    top_img_path="headphones.jpg", 
+                    bottom_img_path="keyboard.jpg"
+                )
+                
+                # Inyectamos datos falsos en el producto para que el bot de Telegram no falle
+                product["original_name"] = "Campaña Especial: PCs Gamer"
+                product["ai_name"] = "🔥 ARMAR TU PC SOÑADA"
+                product["is_on_demand"] = False
+                product["price"] = "VER OFERTAS"
+                product["permalink"] = SITE_URL
 
-            product["ai_name"] = generate_ai_title(
-                product["original_name"],
-                product["permalink"],
-            )
+            elif tipo_publicacion == "branding":
+                print(f"[{index}/{total}] Generando placa especial: Branding / Marca")
+                image_path = generate_branding_campaign()
+                
+                # Inyectamos datos falsos
+                product["original_name"] = "Campaña Institucional de Marca"
+                product["ai_name"] = "🚀 TU TECNOLOGÍA"
+                product["is_on_demand"] = False
+                product["price"] = "TIENDA OFICIAL"
+                product["permalink"] = SITE_URL
 
-            image_path = create_story_template(product, img_obj)
+            else:
+                # Flujo normal de producto de WooCommerce
+                image_response = requests.get(product["raw_url"], headers=headers, timeout=20)
+                if image_response.status_code != 200:
+                    print(f"[{index}/{total}] No se pudo descargar imagen.")
+                    continue
 
-            if auto_approve:
+                img_obj = Image.open(BytesIO(image_response.content)).convert("RGBA")
+
+                product["ai_name"] = generate_ai_title(
+                    product["original_name"],
+                    product["permalink"],
+                )
+
+                image_path = create_story_template(product, img_obj)
+
+           if auto_approve:
                 success, result = publish_to_instagram(image_path, product["permalink"])
                 if success:
                     save_to_history(product["id"])
