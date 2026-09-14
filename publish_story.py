@@ -1054,12 +1054,17 @@ def process_catalog(auto_approve=False):
                 weights=[0, 100, 0]
             )[0]
 
-            if tipo_publicacion == "pcs_gamer":
+if tipo_publicacion == "pcs_gamer":
                 print(f"[{index}/{total}] Generando placa especial: PCs Gamer")
-                image_path = generate_pcs_gamer_campaign(
-                    top_img_path="headphones.jpg", 
-                    bottom_img_path="keyboard.jpg"
-                )
+                # Llamado sin argumentos (las fotos se bajan solas por Unsplash)
+                image_path = generate_pcs_gamer_campaign()
+                
+                # Inyectamos datos de apoyo
+                product["original_name"] = "Campaña Especial: PCs Gamer"
+                product["ai_name"] = "🔥 ARMAR TU PC SOÑADA"
+                product["is_on_demand"] = False
+                product["price"] = "VER OFERTAS"
+                product["permalink"] = SITE_URL
                 
                 # Inyectamos datos falsos
                 product["original_name"] = "Campaña Especial: PCs Gamer"
