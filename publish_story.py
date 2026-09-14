@@ -780,10 +780,9 @@ def create_story_template(product, img_obj):
 import os
 import requests
 from io import BytesIO
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 
 def get_google_font(font_name, size):
-    """Descarga y carga fuentes de Google Fonts dinámicamente si no existen."""
     fonts_dir = "fonts"
     os.makedirs(fonts_dir, exist_ok=True)
     font_path = os.path.join(fonts_dir, f"{font_name}.ttf")
@@ -791,7 +790,7 @@ def get_google_font(font_name, size):
     font_urls = {
         "BebasNeue": "https://github.com/google/fonts/raw/main/ofl/bebasneue/BebasNeue-Regular.ttf",
         "Montserrat-Bold": "https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat-Bold.ttf",
-        "Montserrat-Medium": "https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat-Medium.ttf"
+        "Montserrat-SemiBold": "https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat-SemiBold.ttf"
     }
 
     if not os.path.exists(font_path) and font_name in font_urls:
@@ -808,7 +807,6 @@ def get_google_font(font_name, size):
     return ImageFont.load_default()
 
 def fetch_stock_image(url, fallback_size=(900, 500)):
-    """Obtiene imágenes stock de alta calidad vía URL."""
     try:
         res = requests.get(url, timeout=15)
         if res.status_code == 200:
@@ -817,9 +815,26 @@ def fetch_stock_image(url, fallback_size=(900, 500)):
         print(f"Error descargando imagen stock: {e}")
     return Image.new("RGBA", fallback_size, (20, 20, 35))
 
+def apply_gamer_filter(img):
+    """Aplica filtro oscuro + tintado Cyberpunk/RGB a cualquier imagen."""
+    img = img.convert("RGBA")
+    
+    # 1. Bajar brillo al 45% para lograr el ambiente oscuro
+    brightness = ImageEnhance.Brightness(img)
+    img = brightness.enhance(0.45)
+    
+    # 2. Aumentar contraste
+    contrast = ImageEnhance.Contrast(img)
+    img = contrast.enhance(1.3)
+    
+    # 3. Superponer capa de tinte Magenta/Violáceo
+    tint = Image.new("RGBA", img.size, (40, 0, 70, 110))
+    img = Image.alpha_composite(img, tint)
+    return img
+
 def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
     W, H = 1080, 1920
-    bg_color = (6, 5, 14) # Fondo súper oscuro / cyberpunk
+    bg_color = (8, 6, 18) # Fondo azul/violeta profundo
     img = Image.new("RGBA", (W, H), bg_color)
     draw = ImageDraw.Draw(img)
 
@@ -827,21 +842,22 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
     magenta_neon = (255, 0, 128)
     white = (255, 255, 255)
 
-    # Cargar Fuentes Profesionales
-    font_title = get_google_font("BebasNeue", 120)
-    font_body = get_google_font("Montserrat-Bold", 30)
-    font_sub = get_google_font("Montserrat-Medium", 26)
+    # Tipografías con nuevos tamaños
+    font_title = get_google_font("BebasNeue", 125)
+    font_body = get_google_font("Montserrat-Bold", 40)      # Mucho más grande para lecturabilidad
+    font_sub = get_google_font("Montserrat-SemiBold", 30)   # CTA intermedio
+    font_handle = get_google_font("BebasNeue", 68)          # @CUANTICOPC proporcional
 
-    # 1. Imágenes de Stock Gaming (Unsplash CDN direct)
-    top_img_url = "https://images.unsplash.com/photo-1546435770-a3e426bf472b?q=80&w=1000&auto=format&fit=crop"
-    bottom_img_url = "https://images.unsplash.com/photo-1587829741301-dc798b83add3?q=80&w=1000&auto=format&fit=crop"
+    # URLs con temática setup/periféricos
+    top_img_url = "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1000&auto=format&fit=crop"
+    bottom_img_url = "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?q=80&w=1000&auto=format&fit=crop"
 
     def paste_and_frame(canvas, img_url, box):
         x1, y1, x2, y2 = box
         bw, bh = x2 - x1, y2 - y1
         raw_img = fetch_stock_image(img_url, (bw, bh))
         
-        # Crop & Fit
+        # Recorte proporcional
         iw, ih = raw_img.size
         ratio = max(bw / iw, bh / ih)
         resized = raw_img.resize((int(iw * ratio), int(ih * ratio)), Image.Resampling.LANCZOS)
@@ -849,62 +865,69 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
         top = (resized.height - bh) // 2
         cropped = resized.crop((left, top, left + bw, top + bh))
         
-        canvas.paste(cropped, (x1, y1))
-        # Borde Neón Fino
+        # Tratamiento estético de imagen
+        processed_img = apply_gamer_filter(cropped)
+        
+        canvas.paste(processed_img, (x1, y1))
+        
+        # Borde Neón Cyan
         d = ImageDraw.Draw(canvas)
         d.rectangle([x1, y1, x2, y2], outline=cyan_neon, width=4)
 
-    # Marcos
-    paste_and_frame(img, top_img_url, (90, 80, 990, 580))
-    paste_and_frame(img, bottom_img_url, (90, 820, 990, 1320))
+    # 1. Marcos de fotos
+    paste_and_frame(img, top_img_url, (80, 70, 1000, 550))
+    paste_and_frame(img, bottom_img_url, (80, 740, 1000, 1220))
 
-    # 2. Título Central "PCS GAMER" con Neón Magenta
+    # 2. Título "PCS GAMER"
     title_text = "PCS GAMER"
     bbox = draw.textbbox((0, 0), title_text, font=font_title)
     tx = (W - (bbox[2] - bbox[0])) // 2
-    ty = 635
+    ty = 585
 
-    # Glow magenta
+    # Resplandor Neón
     glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow)
-    for _ in range(5):
+    for _ in range(6):
         gd.text((tx, ty), title_text, font=font_title, fill=magenta_neon)
-    glow = glow.filter(ImageFilter.GaussianBlur(12))
+    glow = glow.filter(ImageFilter.GaussianBlur(14))
     img.alpha_composite(glow)
 
-    # Texto Blanco Firme
     draw = ImageDraw.Draw(img)
     draw.text((tx, ty), title_text, font=font_title, fill=white)
 
-    # Destellos / Sparkles (Vectoriales)
+    # Destellos / Sparkles
     def draw_sparkle(d, cx, cy, size=20, color=white):
         d.polygon([(cx, cy - size), (cx + 4, cy - 4), (cx + size, cy), (cx + 4, cy + 4), 
                    (cx, cy + size), (cx - 4, cy + 4), (cx - size, cy), (cx - 4, cy - 4)], fill=color)
 
-    draw_sparkle(draw, tx - 50, ty + 60, size=22, color=white)
-    draw_sparkle(draw, tx + (bbox[2] - bbox[0]) + 50, ty + 70, size=18, color=cyan_neon)
+    draw_sparkle(draw, tx - 55, ty + 65, size=22, color=white)
+    draw_sparkle(draw, tx + (bbox[2] - bbox[0]) + 55, ty + 70, size=20, color=cyan_neon)
 
-    # 3. Lista de Beneficios con Viñetas Neón
+    # 3. Lista de Beneficios (Grandes y legibles)
     benefits = [
         "HASTA 12 CUOTAS CON TARJETAS",
         "ENVÍOS A TODO EL PAÍS",
         "COMPRÁ POR MERCADOLIBRE"
     ]
     
-    start_y = 1380
+    start_y = 1270
     for i, text in enumerate(benefits):
-        y_pos = start_y + (i * 55)
-        # Cuadrito viñeta en reemplazo del emoji
-        draw.rectangle([100, y_pos + 8, 116, y_pos + 24], fill=magenta_neon)
-        draw.text((135, y_pos), text, font=font_body, fill=white)
+        y_pos = start_y + (i * 68)
+        # Viñeta Neón Magenta
+        draw.rectangle([80, y_pos + 10, 102, y_pos + 32], fill=magenta_neon)
+        draw.text((125, y_pos), text, font=font_body, fill=white)
 
-    # 4. Cierre y Call To Action
-    draw.text((100, 1580), "ESCRIBINOS Y TE ASESORAMOS SIN COMPROMISO.", font=font_sub, fill=white)
-    draw.text((100, 1680), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", font=font_sub, fill=(180, 180, 200))
-    draw.text((100, 1720), "@CUANTICOPC", font=font_title, fill=cyan_neon)
+    # 4. Llamados a la acción
+    draw.text((80, 1510), "ESCRIBINOS Y TE ASESORAMOS SIN COMPROMISO.", font=font_sub, fill=white)
+    draw.text((80, 1610), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", font=font_sub, fill=(180, 180, 200))
+    
+    # Handle Reducido
+    draw.text((80, 1660), "@CUANTICOPC", font=font_handle, fill=cyan_neon)
 
     img.convert("RGB").save(output_path, quality=95)
     return output_path
+
+
 # ============================================================
 # SUBIDA TEMPORAL DE IMAGEN Y META / INSTAGRAM API
 # ============================================================
