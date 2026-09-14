@@ -884,7 +884,7 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
         
         # Borde Neón Grueso (8px)
         d = ImageDraw.Draw(canvas)
-        d.rectangle([x1, y1, x2, y2], outline=cyan_neon, width=8)
+        d.rectangle([x1, y1, x2, y2], outline=cyan_neon, width=12)
 
     # 1. Foto Superior (Recuadro grueso)
     paste_and_frame(img, top_img_url, (70, 60, 1010, 530))
@@ -950,7 +950,7 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
         draw.text((140, y_pos + 2), text, font=font_body, fill=white)
 
     # 5. Llamados a la acción distribuidos verticalmente
-    draw.text((70, 1530), "ESCRIBINOS Y TE ASESORAMOS SIN COMPROMISO.", font=font_sub, fill=white)
+    draw.text((70, 1700), "ESCRIBINOS Y TE ASESORAMOS SIN COMPROMISO.", font=font_sub, fill=white)
 
     # Handle al pie del lienzo
     draw.text((70, 1750), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", font=font_sub)
