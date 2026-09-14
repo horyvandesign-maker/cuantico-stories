@@ -886,28 +886,34 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
         d = ImageDraw.Draw(canvas)
         d.rectangle([x1, y1, x2, y2], outline=cyan_neon, width=20) # borde recuadro imagenes
 
-    # 1. Foto Superior (Recuadro grueso)
-    paste_and_frame(img, top_img_url, (70, 60, 1010, 530))
+   # 1. Foto Superior (Se mantiene en Y=60 a Y=530)
+    top_img_bottom = 530
+    paste_and_frame(img, top_img_url, (70, 60, 1010, top_img_bottom))
 
-    # 2. Título "PCS GAMER" con EFECTO NEÓN INTENSO
+    # 3. Foto Inferior (Bajada a Y=770 a Y=1240)
+    bottom_img_top = 770
+    paste_and_frame(img, bottom_img_url, (70, bottom_img_top, 1010, 1240))
+
+    # 2. Título "PCS GAMER" Centrado Verticalmente entre las fotos
     title_text = "PCS GAMER"
     bbox = draw.textbbox((0, 0), title_text, font=font_title)
-    tx = (W - (bbox[2] - bbox[0])) // 2
-    ty = 560
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
 
-    # Resplandor Neón Multicapa (Capas de desenfoque)
+    tx = (W - text_w) // 2
+    # Cálculo dinámico del centro exacto del hueco de 240px
+    ty = top_img_bottom + ((bottom_img_top - top_img_bottom - text_h) // 2) - bbox[1]
+
+    # Resplandor Neón Multicapa
     glow_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow_layer)
-    
-    # Capa exterior amplia magenta
-    for offset in range(1, 12):
+    for _ in range(12):
         gd.text((tx, ty), title_text, font=font_title, fill=magenta_neon)
     glow_layer = glow_layer.filter(ImageFilter.GaussianBlur(22))
     
-    # Capa interior púrpura intensa
     glow_inner = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     gd_in = ImageDraw.Draw(glow_inner)
-    for offset in range(1, 6):
+    for _ in range(6):
         gd_in.text((tx, ty), title_text, font=font_title, fill=purple_glow)
     glow_inner = glow_inner.filter(ImageFilter.GaussianBlur(10))
 
@@ -915,16 +921,16 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
     img.alpha_composite(glow_inner)
 
     draw = ImageDraw.Draw(img)
-    # Core del texto blanco brillante
     draw.text((tx, ty), title_text, font=font_title, fill=white)
 
-    # Destellos Neón (Sparkles) laterales
+    # Destellos Neón lateralmente alineados al centro del texto
     def draw_sparkle(d, cx, cy, size=26, color=white):
         d.polygon([(cx, cy - size), (cx + 5, cy - 5), (cx + size, cy), (cx + 5, cy + 5), 
                    (cx, cy + size), (cx - 5, cy + 5), (cx - size, cy), (cx - 5, cy - 5)], fill=color)
 
-    draw_sparkle(draw, tx - 65, ty + 70, size=28, color=white)
-    draw_sparkle(draw, tx + (bbox[2] - bbox[0]) + 65, ty + 75, size=26, color=cyan_neon)
+    sparkle_y = ty + (text_h // 2) + bbox[1]
+    draw_sparkle(draw, tx - 65, sparkle_y, size=28, color=white)
+    draw_sparkle(draw, tx + text_w + 65, sparkle_y, size=26, color=cyan_neon)
 
     # 3. Foto Inferior (Recuadro grueso)
     paste_and_frame(img, bottom_img_url, (70, 720, 1010, 1190))
