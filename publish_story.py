@@ -787,13 +787,13 @@ def get_google_font(font_name, size):
     os.makedirs(fonts_dir, exist_ok=True)
     font_path = os.path.join(fonts_dir, f"{font_name}.ttf")
     
-    # URLs de descarga directa sin redirecciones de GitHub
     font_urls = {
         "BebasNeue": "https://raw.githubusercontent.com/google/fonts/main/ofl/bebasneue/BebasNeue-Regular.ttf",
         "Montserrat-Bold": "https://raw.githubusercontent.com/google/fonts/main/ofl/montserrat/Montserrat-Bold.ttf",
         "Montserrat-SemiBold": "https://raw.githubusercontent.com/google/fonts/main/ofl/montserrat/Montserrat-SemiBold.ttf"
     }
 
+    # 1. Intentar descargar la fuente de Google Fonts
     if not os.path.exists(font_path) and font_name in font_urls:
         try:
             res = requests.get(font_urls[font_name], timeout=15)
@@ -803,13 +803,26 @@ def get_google_font(font_name, size):
         except Exception as e:
             print(f"Error descargando fuente {font_name}: {e}")
 
+    # 2. Cargar fuente Truetype descargada
     if os.path.exists(font_path):
         try:
             return ImageFont.truetype(font_path, size)
-        except Exception as e:
-            print(f"Error cargando fuente {font_path}: {e}")
+        except Exception:
+            pass
 
-    # Fallback con tamaño adaptable si falla la descarga
+    # 3. Fallback a fuentes del sistema Linux (soporta acentos UTF-8)
+    system_fonts = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf"
+    ]
+    for sys_font in system_fonts:
+        if os.path.exists(sys_font):
+            try:
+                return ImageFont.truetype(sys_font, size)
+            except Exception:
+                continue
+
     try:
         return ImageFont.load_default(size=size)
     except TypeError:
@@ -825,38 +838,32 @@ def fetch_stock_image(url, fallback_size=(900, 500)):
     return Image.new("RGBA", fallback_size, (20, 20, 35))
 
 def apply_gamer_filter(img):
-    """Aplica filtro oscuro + tintado RGB Cyberpunk a las fotos."""
+    """Aplica filtro oscuro + tintado Cyberpunk a las fotos."""
     img = img.convert("RGBA")
-    
-    # 1. Bajar brillo al 45% para ambiente nocturno
     brightness = ImageEnhance.Brightness(img)
     img = brightness.enhance(0.45)
-    
-    # 2. Aumentar contraste
     contrast = ImageEnhance.Contrast(img)
     img = contrast.enhance(1.3)
-    
-    # 3. Superponer tinte magenta/violáceo
-    tint = Image.new("RGBA", img.size, (40, 0, 70, 110))
+    tint = Image.new("RGBA", img.size, (50, 0, 80, 110))
     return Image.alpha_composite(img, tint)
 
 def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
     W, H = 1080, 1920
-    bg_color = (8, 6, 18)
+    bg_color = (6, 4, 14)
     img = Image.new("RGBA", (W, H), bg_color)
     draw = ImageDraw.Draw(img)
 
     cyan_neon = (0, 245, 255)
-    magenta_neon = (255, 0, 128)
+    magenta_neon = (255, 0, 150)
+    purple_glow = (180, 0, 255)
     white = (255, 255, 255)
 
-    # Tipografías con escalado gigante para 1080x1920
-    font_title = get_google_font("BebasNeue", 130)
-    font_body = get_google_font("Montserrat-Bold", 48)       # Beneficios bien legibles
-    font_sub = get_google_font("Montserrat-SemiBold", 34)    # Textos de llamada a la acción
-    font_handle = get_google_font("BebasNeue", 80)           # Brand handle
+    # Tipografías ajustadas
+    font_title = get_google_font("BebasNeue", 140)
+    font_body = get_google_font("Montserrat-Bold", 42)
+    font_sub = get_google_font("Montserrat-SemiBold", 32)
+    font_handle = get_google_font("BebasNeue", 85)
 
-    # Imágenes de alta resolución de Unsplash
     top_img_url = "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1000&auto=format&fit=crop"
     bottom_img_url = "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?q=80&w=1000&auto=format&fit=crop"
 
@@ -875,58 +882,79 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
         processed_img = apply_gamer_filter(cropped)
         canvas.paste(processed_img, (x1, y1))
         
+        # Borde Neón Grueso (8px)
         d = ImageDraw.Draw(canvas)
-        d.rectangle([x1, y1, x2, y2], outline=cyan_neon, width=4)
+        d.rectangle([x1, y1, x2, y2], outline=cyan_neon, width=8)
 
-    # 1. Cuadros de fotos ajustados
-    paste_and_frame(img, top_img_url, (80, 70, 1000, 520))
-    paste_and_frame(img, bottom_img_url, (80, 710, 1000, 1160))
+    # 1. Foto Superior (Recuadro grueso)
+    paste_and_frame(img, top_img_url, (70, 60, 1010, 530))
 
-    # 2. Título principal "PCS GAMER"
+    # 2. Título "PCS GAMER" con EFECTO NEÓN INTENSO
     title_text = "PCS GAMER"
     bbox = draw.textbbox((0, 0), title_text, font=font_title)
     tx = (W - (bbox[2] - bbox[0])) // 2
-    ty = 550
+    ty = 560
 
-    # Efecto Glow Neón
-    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    gd = ImageDraw.Draw(glow)
-    for _ in range(6):
+    # Resplandor Neón Multicapa (Capas de desenfoque)
+    glow_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow_layer)
+    
+    # Capa exterior amplia magenta
+    for offset in range(1, 12):
         gd.text((tx, ty), title_text, font=font_title, fill=magenta_neon)
-    glow = glow.filter(ImageFilter.GaussianBlur(14))
-    img.alpha_composite(glow)
+    glow_layer = glow_layer.filter(ImageFilter.GaussianBlur(22))
+    
+    # Capa interior púrpura intensa
+    glow_inner = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    gd_in = ImageDraw.Draw(glow_inner)
+    for offset in range(1, 6):
+        gd_in.text((tx, ty), title_text, font=font_title, fill=purple_glow)
+    glow_inner = glow_inner.filter(ImageFilter.GaussianBlur(10))
+
+    img.alpha_composite(glow_layer)
+    img.alpha_composite(glow_inner)
 
     draw = ImageDraw.Draw(img)
+    # Core del texto blanco brillante
     draw.text((tx, ty), title_text, font=font_title, fill=white)
 
-    # Destellos / Sparkles
-    def draw_sparkle(d, cx, cy, size=22, color=white):
-        d.polygon([(cx, cy - size), (cx + 4, cy - 4), (cx + size, cy), (cx + 4, cy + 4), 
-                   (cx, cy + size), (cx - 4, cy + 4), (cx - size, cy), (cx - 4, cy - 4)], fill=color)
+    # Destellos Neón (Sparkles) laterales
+    def draw_sparkle(d, cx, cy, size=26, color=white):
+        d.polygon([(cx, cy - size), (cx + 5, cy - 5), (cx + size, cy), (cx + 5, cy + 5), 
+                   (cx, cy + size), (cx - 5, cy + 5), (cx - size, cy), (cx - 5, cy - 5)], fill=color)
 
-    draw_sparkle(draw, tx - 55, ty + 68, size=24, color=white)
-    draw_sparkle(draw, tx + (bbox[2] - bbox[0]) + 55, ty + 72, size=22, color=cyan_neon)
+    draw_sparkle(draw, tx - 65, ty + 70, size=28, color=white)
+    draw_sparkle(draw, tx + (bbox[2] - bbox[0]) + 65, ty + 75, size=26, color=cyan_neon)
 
-    # 3. Lista de Beneficios (Viñetas y textos grandes)
+    # 3. Foto Inferior (Recuadro grueso)
+    paste_and_frame(img, bottom_img_url, (70, 720, 1010, 1190))
+
+    # 4. Beneficios con Iconos Neón (Acentos UTF-8 100% funcionales)
     benefits = [
-        "HASTA 12 CUOTAS CON TARJETAS",
-        "ENVÍOS A TODO EL PAÍS",
-        "COMPRÁ POR MERCADOLIBRE"
+        ("💳", "HASTA 12 CUOTAS CON TARJETAS"),
+        ("📦", "ENVÍOS A TODO EL PAÍS"),
+        ("🛒", "COMPRÁ POR MERCADOLIBRE")
     ]
     
-    start_y = 1220
-    for i, text in enumerate(benefits):
-        y_pos = start_y + (i * 85)
-        # Viñeta Neón Magenta Cuadrada (30x30 px)
-        draw.rectangle([80, y_pos + 8, 110, y_pos + 38], fill=magenta_neon)
-        draw.text((130, y_pos), text, font=font_body, fill=white)
+    start_y = 1240
+    for i, (icon_symbol, text) in enumerate(benefits):
+        y_pos = start_y + (i * 90)
+        
+        # Insignia/Badge neón izquierda
+        draw.rounded_rectangle([70, y_pos, 120, y_pos + 50], radius=8, fill=magenta_neon)
+        
+        # Punto blanco dentro del badge
+        draw.ellipse([88, y_pos + 18, 102, y_pos + 32], fill=white)
+        
+        # Texto del beneficio con acentos nativos
+        draw.text((140, y_pos + 2), text, font=font_body, fill=white)
 
-    # 4. Llamados a la acción y Handle
-    draw.text((80, 1510), "ESCRIBINOS Y TE ASESORAMOS SIN COMPROMISO.", font=font_sub, fill=white)
-    draw.text((80, 1590), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", font=font_sub, fill=(180, 180, 200))
+    # 5. Llamados a la acción distribuidos verticalmente
+    draw.text((70, 1530), "ESCRIBINOS Y TE ASESORAMOS SIN COMPROMISO.", font=font_sub, fill=white)
+    draw.text((70, 1610), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", font=font_sub, fill=(180, 180, 210))
     
-    # Handle grande
-    draw.text((80, 1660), "@CUANTICOPC", font=font_handle, fill=cyan_neon)
+    # Handle al pie del lienzo
+    draw.text((70, 1680), "@CUANTICOPC", font=font_handle, fill=cyan_neon)
 
     img.convert("RGB").save(output_path, quality=95)
     return output_path
