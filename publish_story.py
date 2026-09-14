@@ -884,7 +884,7 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
         
         # Borde Neón Grueso (8px)
         d = ImageDraw.Draw(canvas)
-        d.rectangle([x1, y1, x2, y2], outline=cyan_neon, width=12)
+        d.rectangle([x1, y1, x2, y2], outline=cyan_neon, width=20) # borde recuadro imagenes
 
     # 1. Foto Superior (Recuadro grueso)
     paste_and_frame(img, top_img_url, (70, 60, 1010, 530))
@@ -940,14 +940,14 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
     for i, (icon_symbol, text) in enumerate(benefits):
         y_pos = start_y + (i * 90)
         
-        # Insignia/Badge neón izquierda
-        draw.rounded_rectangle([70, y_pos, 120, y_pos + 50], radius=8, fill=magenta_neon)
+    # Insignia/Badge neón izquierda más chica (28x28 px)
+        draw.rounded_rectangle([70, y_pos + 8, 98, y_pos + 36], radius=5, fill=magenta_neon)
         
-        # Punto blanco dentro del badge
-        draw.ellipse([88, y_pos + 18, 102, y_pos + 32], fill=white)
+        # Punto blanco centrado dentro del badge (8x8 px)
+        draw.ellipse([80, y_pos + 18, 88, y_pos + 26], fill=white)
         
-        # Texto del beneficio con acentos nativos
-        draw.text((140, y_pos + 2), text, font=font_body, fill=white)
+        # Texto del beneficio ajustado más cerca del badge
+        draw.text((115, y_pos + 2), text, font=font_body, fill=white)
 
     # 5. Llamados a la acción distribuidos verticalmente
     draw.text((70, 1700), "ESCRIBINOS Y TE ASESORAMOS SIN COMPROMISO.", font=font_sub, fill=white)
