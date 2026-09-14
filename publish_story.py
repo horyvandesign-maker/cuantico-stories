@@ -1112,7 +1112,7 @@ def process_catalog(auto_approve=False):
             # CUANDO TERMINES, VOLVELO A weights=[70, 15, 15]
             tipo_publicacion = random.choices(
                 ["producto", "pcs_gamer", "branding"], 
-                weights=[0, 100, 0]
+                weights=[70, 15, 15]
             )[0]
 
             if tipo_publicacion == "pcs_gamer":
