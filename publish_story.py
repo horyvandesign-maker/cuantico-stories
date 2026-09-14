@@ -951,10 +951,10 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
 
     # 5. Llamados a la acción distribuidos verticalmente
     draw.text((70, 1530), "ESCRIBINOS Y TE ASESORAMOS SIN COMPROMISO.", font=font_sub, fill=white)
-    draw.text((70, 1610), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", font=font_sub, fill=(180, 180, 210))
-    
+
     # Handle al pie del lienzo
-    draw.text((70, 1800), "@CUANTICOPC", font=font_handle, fill=cyan_neon)
+    draw.text((70, 1700), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", font=font_sub, fill=(180, 180, 210))
+    draw.text((70, 1800), "@CUANTICOPC", font=font_handle)
     #draw.text((70, 1680), "@CUANTICOPC", font=font_handle, fill=cyan_neon)
 
     img.convert("RGB").save(output_path, quality=95)
