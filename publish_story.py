@@ -930,23 +930,26 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
     paste_and_frame(img, bottom_img_url, (70, 720, 1010, 1190))
 
     # 4. Beneficios con Iconos Neón (Acentos UTF-8 100% funcionales)
+    # 4. Beneficios más juntos (con límite inferior fijo en MercadoLibre)
     benefits = [
         ("💳", "HASTA 12 CUOTAS CON TARJETAS"),
         ("📦", "ENVÍOS A TODO EL PAÍS"),
         ("🛒", "COMPRÁ POR MERCADOLIBRE")
     ]
     
-    start_y = 1240
+    start_y = 1300  # Bajamos el inicio para compactar hacia la tercera línea
+    step_y = 60     # Reducimos el espaciado de 90px a 60px
+    
     for i, (icon_symbol, text) in enumerate(benefits):
-        y_pos = start_y + (i * 90)
+        y_pos = start_y + (i * step_y)
         
-    # Insignia/Badge neón izquierda más chica (28x28 px)
+        # Insignia/Badge neón izquierda (28x28 px)
         draw.rounded_rectangle([70, y_pos + 8, 98, y_pos + 36], radius=5, fill=magenta_neon)
         
         # Punto blanco centrado dentro del badge (8x8 px)
         draw.ellipse([80, y_pos + 18, 88, y_pos + 26], fill=white)
         
-        # Texto del beneficio ajustado más cerca del badge
+        # Texto del beneficio
         draw.text((115, y_pos + 2), text, font=font_body, fill=white)
 
     # 5. Llamados a la acción distribuidos verticalmente
