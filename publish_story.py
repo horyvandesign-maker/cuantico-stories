@@ -1054,7 +1054,7 @@ def process_catalog(auto_approve=False):
                 weights=[0, 100, 0]
             )[0]
 
-    if tipo_publicacion == "pcs_gamer":
+            if tipo_publicacion == "pcs_gamer":
                 print(f"[{index}/{total}] Generando placa especial: PCs Gamer")
                 # Llamado sin argumentos (las fotos se bajan solas por Unsplash)
                 image_path = generate_pcs_gamer_campaign()
@@ -1065,19 +1065,12 @@ def process_catalog(auto_approve=False):
                 product["is_on_demand"] = False
                 product["price"] = "VER OFERTAS"
                 product["permalink"] = SITE_URL
-                
-                # Inyectamos datos falsos
-                product["original_name"] = "Campaña Especial: PCs Gamer"
-                product["ai_name"] = "🔥 ARMAR TU PC SOÑADA"
-                product["is_on_demand"] = False
-                product["price"] = "VER OFERTAS"
-                product["permalink"] = SITE_URL
 
             elif tipo_publicacion == "branding":
                 print(f"[{index}/{total}] Generando placa especial: Branding / Marca")
                 image_path = generate_branding_campaign()
                 
-                # Inyectamos datos falsos
+                # Inyectamos datos de apoyo
                 product["original_name"] = "Campaña Institucional de Marca"
                 product["ai_name"] = "🚀 TU TECNOLOGÍA"
                 product["is_on_demand"] = False
@@ -1100,7 +1093,6 @@ def process_catalog(auto_approve=False):
 
                 image_path = create_story_template(product, img_obj)
 
-            # --- ACÁ ESTÁ CORREGIDA LA ALINEACIÓN ---
             if auto_approve:
                 success, result = publish_to_instagram(image_path, product["permalink"])
                 if success:
@@ -1226,7 +1218,6 @@ def process_catalog(auto_approve=False):
             print(f"Error procesando producto {product.get('id')}: {error}")
             delete_local_file(image_path)
             continue
-
 
 # ============================================================
 # MAIN
