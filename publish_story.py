@@ -894,7 +894,7 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
 
     # 3. Título "PCS GAMER" Centrado Verticalmente entre las fotos
     title_text = "PCS GAMER"
-    bbox = draw.text((tx, ty), title_text, font=font_title, fill=pink_neon)
+    bbox = draw.textbbox((0, 0), title_text, font=font_title)
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
 
@@ -905,7 +905,7 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
     glow_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow_layer)
     for _ in range(12):
-        gd.text((tx, ty), title_text, font=font_title, fill=magenta_neon)
+        gd.text((tx, ty), title_text, font=font_title, fill=pink_neon)
     glow_layer = glow_layer.filter(ImageFilter.GaussianBlur(22))
     
     glow_inner = Image.new("RGBA", (W, H), (0, 0, 0, 0))
