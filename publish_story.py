@@ -956,9 +956,9 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
         draw.text((115, y_pos + 2), text, font=font_body, fill=white)
 
     # 5. Llamados a la acción distribuidos al pie (Mismo tamaño de fuente)
-    draw.text((70, 1630), "ESCRIBINOS Y TE ASESORAMOS SIN COMPROMISO.", font=font_sub, fill=white)
-    draw.text((70, 1690), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", font=font_sub, fill=(180, 180, 210))
-    draw.text((70, 1750), "@CUANTICOPC", font=font_sub, fill=cyan_neon)
+    draw.text((70, 1600), "ESCRIBINOS Y TE ASESORAMOS SIN COMPROMISO.", font=font_sub, fill=white)
+    draw.text((70, 1750), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", font=font_sub, fill=(180, 180, 210))
+    draw.text((70, 1800), "@CUANTICOPC", font=font_sub, fill=white)
 
     img.convert("RGB").save(output_path, quality=95)
     return output_path
