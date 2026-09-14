@@ -1028,25 +1028,24 @@ def process_catalog(auto_approve=False):
             parse_mode="HTML",
         )
 
-for index, product in enumerate(products, start=1):
+    for index, product in enumerate(products, start=1):
         image_path = None
         try:
-            # 1. Definimos las probabilidades: 70% Producto normal, 15% PCs Gamer, 15% Branding
+            # PARA LA PRUEBA, PONÉ ESTO EN weights=[0, 100, 0]
+            # CUANDO TERMINES, VOLVELO A weights=[70, 15, 15]
             tipo_publicacion = random.choices(
                 ["producto", "pcs_gamer", "branding"], 
-                weights=[70, 15, 15]
+                weights=[0, 100, 0]
             )[0]
 
             if tipo_publicacion == "pcs_gamer":
                 print(f"[{index}/{total}] Generando placa especial: PCs Gamer")
-                # IMPORTANTE: Asegurate de tener estas dos imágenes en la misma carpeta del script
-                # o actualizá las rutas si las tenés en una subcarpeta (ej. 'assets/headphones.jpg')
                 image_path = generate_pcs_gamer_campaign(
                     top_img_path="headphones.jpg", 
                     bottom_img_path="keyboard.jpg"
                 )
                 
-                # Inyectamos datos falsos en el producto para que el bot de Telegram no falle
+                # Inyectamos datos falsos
                 product["original_name"] = "Campaña Especial: PCs Gamer"
                 product["ai_name"] = "🔥 ARMAR TU PC SOÑADA"
                 product["is_on_demand"] = False
@@ -1080,7 +1079,8 @@ for index, product in enumerate(products, start=1):
 
                 image_path = create_story_template(product, img_obj)
 
-           if auto_approve:
+            # --- ACÁ ESTÁ CORREGIDA LA ALINEACIÓN ---
+            if auto_approve:
                 success, result = publish_to_instagram(image_path, product["permalink"])
                 if success:
                     save_to_history(product["id"])
