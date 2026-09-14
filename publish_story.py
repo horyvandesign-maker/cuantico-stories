@@ -953,7 +953,7 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
     draw.text((70, 1530), "ESCRIBINOS Y TE ASESORAMOS SIN COMPROMISO.", font=font_sub, fill=white)
 
     # Handle al pie del lienzo
-    draw.text((70, 1780), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", font=font_sub)
+    draw.text((70, 1750), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", font=font_sub)
     draw.text((70, 1800), "@CUANTICOPC", font=font_sub)
     #draw.text((70, 1680), "@CUANTICOPC", font=font_handle, fill=cyan_neon)
 
