@@ -793,7 +793,6 @@ def get_google_font(font_name, size):
         "Montserrat-SemiBold": "https://raw.githubusercontent.com/google/fonts/main/ofl/montserrat/Montserrat-SemiBold.ttf"
     }
 
-    # 1. Intentar descargar la fuente de Google Fonts
     if not os.path.exists(font_path) and font_name in font_urls:
         try:
             res = requests.get(font_urls[font_name], timeout=15)
@@ -803,14 +802,13 @@ def get_google_font(font_name, size):
         except Exception as e:
             print(f"Error descargando fuente {font_name}: {e}")
 
-    # 2. Cargar fuente Truetype descargada
     if os.path.exists(font_path):
         try:
             return ImageFont.truetype(font_path, size)
         except Exception:
             pass
 
-    # 3. Fallback a fuentes del sistema Linux (soporta acentos UTF-8)
+    # Fallback a fuentes del sistema
     system_fonts = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
@@ -858,11 +856,10 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
     purple_glow = (180, 0, 255)
     white = (255, 255, 255)
 
-    # Tipografías ajustadas
+    # Tipografías
     font_title = get_google_font("BebasNeue", 140)
     font_body = get_google_font("Montserrat-Bold", 42)
     font_sub = get_google_font("Montserrat-SemiBold", 32)
-    font_handle = get_google_font("BebasNeue", 85)
 
     top_img_url = "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1000&auto=format&fit=crop"
     bottom_img_url = "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?q=80&w=1000&auto=format&fit=crop"
@@ -884,24 +881,23 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
         
         # Borde Neón Grueso (8px)
         d = ImageDraw.Draw(canvas)
-        d.rectangle([x1, y1, x2, y2], outline=cyan_neon, width=20) # borde recuadro imagenes
+        d.rectangle([x1, y1, x2, y2], outline=cyan_neon, width=8)
 
-   # 1. Foto Superior (Se mantiene en Y=60 a Y=530)
+    # 1. Foto Superior (Se mantiene fija)
     top_img_bottom = 530
     paste_and_frame(img, top_img_url, (70, 60, 1010, top_img_bottom))
 
-    # 3. Foto Inferior (Bajada a Y=770 a Y=1240)
+    # 2. Foto Inferior (Bajada a Y=770)
     bottom_img_top = 770
     paste_and_frame(img, bottom_img_url, (70, bottom_img_top, 1010, 1240))
 
-    # 2. Título "PCS GAMER" Centrado Verticalmente entre las fotos
+    # 3. Título "PCS GAMER" Centrado Verticalmente entre las fotos
     title_text = "PCS GAMER"
     bbox = draw.textbbox((0, 0), title_text, font=font_title)
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
 
     tx = (W - text_w) // 2
-    # Cálculo dinámico del centro exacto del hueco de 240px
     ty = top_img_bottom + ((bottom_img_top - top_img_bottom - text_h) // 2) - bbox[1]
 
     # Resplandor Neón Multicapa
@@ -923,7 +919,7 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
     draw = ImageDraw.Draw(img)
     draw.text((tx, ty), title_text, font=font_title, fill=white)
 
-    # Destellos Neón lateralmente alineados al centro del texto
+    # Destellos Neón
     def draw_sparkle(d, cx, cy, size=26, color=white):
         d.polygon([(cx, cy - size), (cx + 5, cy - 5), (cx + size, cy), (cx + 5, cy + 5), 
                    (cx, cy + size), (cx - 5, cy + 5), (cx - size, cy), (cx - 5, cy - 5)], fill=color)
@@ -932,19 +928,15 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
     draw_sparkle(draw, tx - 65, sparkle_y, size=28, color=white)
     draw_sparkle(draw, tx + text_w + 65, sparkle_y, size=26, color=cyan_neon)
 
-    # 3. Foto Inferior (Recuadro grueso)
-    paste_and_frame(img, bottom_img_url, (70, 720, 1010, 1190))
-
-    # 4. Beneficios con Iconos Neón (Acentos UTF-8 100% funcionales)
-    # 4. Beneficios más juntos (con límite inferior fijo en MercadoLibre)
+    # 4. Beneficios compactados
     benefits = [
         ("💳", "HASTA 12 CUOTAS CON TARJETAS"),
         ("📦", "ENVÍOS A TODO EL PAÍS"),
         ("🛒", "COMPRÁ POR MERCADOLIBRE")
     ]
     
-    start_y = 1300  # Bajamos el inicio para compactar hacia la tercera línea
-    step_y = 60     # Reducimos el espaciado de 90px a 60px
+    start_y = 1300
+    step_y = 60
     
     for i, (icon_symbol, text) in enumerate(benefits):
         y_pos = start_y + (i * step_y)
@@ -958,17 +950,16 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
         # Texto del beneficio
         draw.text((115, y_pos + 2), text, font=font_body, fill=white)
 
-    # 5. Llamados a la acción distribuidos verticalmente
-    draw.text((70, 1700), "ESCRIBINOS Y TE ASESORAMOS SIN COMPROMISO.", font=font_sub, fill=white)
-
-    # Handle al pie del lienzo
-    draw.text((70, 1750), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", font=font_sub)
-    draw.text((70, 1800), "@CUANTICOPC", font=font_sub)
-    #draw.text((70, 1680), "@CUANTICOPC", font=font_handle, fill=cyan_neon)
+    # 5. Llamados a la acción distribuidos al pie (Mismo tamaño de fuente)
+    draw.text((70, 1630), "ESCRIBINOS Y TE ASESORAMOS SIN COMPROMISO.", font=font_sub, fill=white)
+    draw.text((70, 1690), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", font=font_sub, fill=(180, 180, 210))
+    draw.text((70, 1750), "@CUANTICOPC", font=font_sub, fill=cyan_neon)
 
     img.convert("RGB").save(output_path, quality=95)
     return output_path
 
+if __name__ == "__main__":
+    generate_pcs_gamer_campaign()
 
 # ============================================================
 # SUBIDA TEMPORAL DE IMAGEN Y META / INSTAGRAM API
