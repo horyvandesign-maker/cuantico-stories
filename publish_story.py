@@ -777,118 +777,134 @@ def create_story_template(product, img_obj):
 # PLANTILLAS DE CAMPAÑA INSTITUCIONAL
 # ============================================================
 
-def generate_pcs_gamer_campaign(top_img_path, bottom_img_path, output_path="pcs_gamer_story.jpg"):
+import os
+import requests
+from io import BytesIO
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
+
+def get_google_font(font_name, size):
+    """Descarga y carga fuentes de Google Fonts dinámicamente si no existen."""
+    fonts_dir = "fonts"
+    os.makedirs(fonts_dir, exist_ok=True)
+    font_path = os.path.join(fonts_dir, f"{font_name}.ttf")
+    
+    font_urls = {
+        "BebasNeue": "https://github.com/google/fonts/raw/main/ofl/bebasneue/BebasNeue-Regular.ttf",
+        "Montserrat-Bold": "https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat-Bold.ttf",
+        "Montserrat-Medium": "https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat-Medium.ttf"
+    }
+
+    if not os.path.exists(font_path) and font_name in font_urls:
+        try:
+            res = requests.get(font_urls[font_name], timeout=10)
+            if res.status_code == 200:
+                with open(font_path, "wb") as f:
+                    f.write(res.content)
+        except Exception as e:
+            print(f"Error descargando fuente {font_name}: {e}")
+
+    if os.path.exists(font_path):
+        return ImageFont.truetype(font_path, size)
+    return ImageFont.load_default()
+
+def fetch_stock_image(url, fallback_size=(900, 500)):
+    """Obtiene imágenes stock de alta calidad vía URL."""
+    try:
+        res = requests.get(url, timeout=15)
+        if res.status_code == 200:
+            return Image.open(BytesIO(res.content)).convert("RGBA")
+    except Exception as e:
+        print(f"Error descargando imagen stock: {e}")
+    return Image.new("RGBA", fallback_size, (20, 20, 35))
+
+def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
     W, H = 1080, 1920
-    bg_color = (11, 10, 21)
+    bg_color = (6, 5, 14) # Fondo súper oscuro / cyberpunk
     img = Image.new("RGBA", (W, H), bg_color)
     draw = ImageDraw.Draw(img)
 
-    cyan_neon = (0, 243, 255)
+    cyan_neon = (0, 245, 255)
     magenta_neon = (255, 0, 128)
     white = (255, 255, 255)
-    soft_cyan = (180, 245, 255)
 
-    font_title = get_font(85)
-    font_body = get_font(34)
-    font_footer = get_font(30)
+    # Cargar Fuentes Profesionales
+    font_title = get_google_font("BebasNeue", 120)
+    font_body = get_google_font("Montserrat-Bold", 30)
+    font_sub = get_google_font("Montserrat-Medium", 26)
 
-    def paste_cropped_image(canvas, image_path, box_coords):
-        x1, y1, x2, y2 = box_coords
-        box_w, box_h = x2 - x1, y2 - y1
-        if os.path.exists(image_path):
-            with Image.open(image_path) as input_img:
-                input_img = input_img.convert("RGBA")
-                img_w, img_h = input_img.size
-                ratio = max(box_w / img_w, box_h / img_h)
-                new_size = (int(img_w * ratio), int(img_h * ratio))
-                resized = input_img.resize(new_size, Image.Resampling.LANCZOS)
-                
-                left = (resized.width - box_w) // 2
-                top = (resized.height - box_h) // 2
-                cropped = resized.crop((left, top, left + box_w, top + box_h))
-                canvas.paste(cropped, (x1, y1))
+    # 1. Imágenes de Stock Gaming (Unsplash CDN direct)
+    top_img_url = "https://images.unsplash.com/photo-1546435770-a3e426bf472b?q=80&w=1000&auto=format&fit=crop"
+    bottom_img_url = "https://images.unsplash.com/photo-1587829741301-dc798b83add3?q=80&w=1000&auto=format&fit=crop"
 
-    # 1. Cajas de imagen superior e inferior
-    top_box = (90, 80, 990, 580)
-    paste_cropped_image(img, top_img_path, top_box)
-    draw.rounded_rectangle(top_box, radius=12, outline=cyan_neon, width=6)
+    def paste_and_frame(canvas, img_url, box):
+        x1, y1, x2, y2 = box
+        bw, bh = x2 - x1, y2 - y1
+        raw_img = fetch_stock_image(img_url, (bw, bh))
+        
+        # Crop & Fit
+        iw, ih = raw_img.size
+        ratio = max(bw / iw, bh / ih)
+        resized = raw_img.resize((int(iw * ratio), int(ih * ratio)), Image.Resampling.LANCZOS)
+        left = (resized.width - bw) // 2
+        top = (resized.height - bh) // 2
+        cropped = resized.crop((left, top, left + bw, top + bh))
+        
+        canvas.paste(cropped, (x1, y1))
+        # Borde Neón Fino
+        d = ImageDraw.Draw(canvas)
+        d.rectangle([x1, y1, x2, y2], outline=cyan_neon, width=4)
 
-    bottom_box = (90, 820, 990, 1320)
-    paste_cropped_image(img, bottom_img_path, bottom_box)
-    draw.rounded_rectangle(bottom_box, radius=12, outline=cyan_neon, width=6)
+    # Marcos
+    paste_and_frame(img, top_img_url, (90, 80, 990, 580))
+    paste_and_frame(img, bottom_img_url, (90, 820, 990, 1320))
 
-    # 2. Título Central
+    # 2. Título Central "PCS GAMER" con Neón Magenta
     title_text = "PCS GAMER"
     bbox = draw.textbbox((0, 0), title_text, font=font_title)
-    title_x = (W - (bbox[2] - bbox[0])) // 2
-    title_y = 660
+    tx = (W - (bbox[2] - bbox[0])) // 2
+    ty = 635
 
-    glow_img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    glow_draw = ImageDraw.Draw(glow_img)
-    for offset in range(1, 8):
-        glow_draw.text((title_x, title_y), title_text, font=font_title, fill=magenta_neon)
-    glow_img = glow_img.filter(ImageFilter.GaussianBlur(6))
-    img.alpha_composite(glow_img)
-    draw.text((title_x, title_y), title_text, font=font_title, fill=white)
+    # Glow magenta
+    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    for _ in range(5):
+        gd.text((tx, ty), title_text, font=font_title, fill=magenta_neon)
+    glow = glow.filter(ImageFilter.GaussianBlur(12))
+    img.alpha_composite(glow)
 
-    # 3. Beneficios
-    bullets = [
-        "💳  HASTA 12 CUOTAS CON TARJETAS",
-        "📦  ENVÍOS A TODO EL PAÍS",
-        "🛒  COMPRÁ POR MERCADOLIBRE"
-    ]
-    for i, line in enumerate(bullets):
-        draw.text((100, 1380 + (i * 52)), line, font=font_body, fill=white)
-
-    # 4. Textos finales
-    draw.text((W // 2, 1580), "ESCRIBINOS Y TE ASESORAMOS SIN COMPROMISO.", font=font_body, fill=soft_cyan, anchor="mm")
-    draw.text((W // 2, 1690), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", font=font_footer, fill=white, anchor="mm")
-    draw.text((W // 2, 1740), "@CUANTICOPC", font=font_title, fill=cyan_neon, anchor="mm")
-
-    img.convert("RGB").save(output_path, quality=95)
-    return output_path
-
-def generate_branding_campaign(output_path="branding_story.jpg"):
-    W, H = 1080, 1920
-    img = Image.new("RGBA", (W, H), (8, 12, 28))
+    # Texto Blanco Firme
     draw = ImageDraw.Draw(img)
+    draw.text((tx, ty), title_text, font=font_title, fill=white)
 
-    cyan_neon = (0, 245, 212)
-    white = (255, 255, 255)
-    soft_blue = (180, 210, 255)
+    # Destellos / Sparkles (Vectoriales)
+    def draw_sparkle(d, cx, cy, size=20, color=white):
+        d.polygon([(cx, cy - size), (cx + 4, cy - 4), (cx + size, cy), (cx + 4, cy + 4), 
+                   (cx, cy + size), (cx - 4, cy + 4), (cx - size, cy), (cx - 4, cy - 4)], fill=color)
 
-    draw.line([(800, 0), (800, 180), (1000, 300)], fill=(0, 245, 212, 130), width=3)
-    draw.ellipse((995, 295, 1005, 305), fill=cyan_neon)
-    draw.line([(80, 1150), (80, 1500), (320, 1750)], fill=(0, 245, 212, 130), width=3)
-    draw.ellipse((315, 1745, 325, 1755), fill=cyan_neon)
+    draw_sparkle(draw, tx - 50, ty + 60, size=22, color=white)
+    draw_sparkle(draw, tx + (bbox[2] - bbox[0]) + 50, ty + 70, size=18, color=cyan_neon)
 
-    logo_path = os.path.join(os.path.dirname(__file__), "logo_canva.png")
-    if os.path.exists(logo_path):
-        try:
-            logo_img = Image.open(logo_path).convert("RGBA")
-            logo_img.thumbnail((500, 180), Image.Resampling.LANCZOS)
-            img.paste(logo_img, ((W - logo_img.width) // 2, 150), logo_img)
-        except Exception:
-            draw.text((W // 2, 200), "CUANTICO PC", fill=white, font=get_font(50), anchor="mm")
+    # 3. Lista de Beneficios con Viñetas Neón
+    benefits = [
+        "HASTA 12 CUOTAS CON TARJETAS",
+        "ENVÍOS A TODO EL PAÍS",
+        "COMPRÁ POR MERCADOLIBRE"
+    ]
+    
+    start_y = 1380
+    for i, text in enumerate(benefits):
+        y_pos = start_y + (i * 55)
+        # Cuadrito viñeta en reemplazo del emoji
+        draw.rectangle([100, y_pos + 8, 116, y_pos + 24], fill=magenta_neon)
+        draw.text((135, y_pos), text, font=font_body, fill=white)
 
-    font_title = get_font(56)
-    draw.text((100, 420), "TU TECNOLOGÍA", fill=white, font=font_title)
-    draw.text((100, 490), "NUESTRA EXPERIENCIA", fill=white, font=font_title)
-
-    font_sub = get_font(32)
-    for i, item in enumerate(["💻   Notebooks", "🖥️   PCs Gamer y Oficina", "🌐   Redes y Conectividad", "🎧   Accesorios"]):
-        draw.text((100, 620 + (i * 55)), item, fill=soft_blue, font=font_sub)
-
-    draw.text((100, 960), "VENTA ONLINE Y PRESENCIAL", fill=cyan_neon, font=get_font(34))
-    for i, item in enumerate(["🛒   MercadoLibre", "🚚   Envíos a todo el país", "💵   Descuentos en efectivo"]):
-        draw.text((100, 1040 + (i * 55)), item, fill=white, font=font_sub)
-
-    draw.text((W // 2, 1680), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", fill=white, font=get_font(28), anchor="mm")
-    draw.text((W // 2, 1730), "@CUANTICOPC", fill=cyan_neon, font=get_font(38), anchor="mm")
+    # 4. Cierre y Call To Action
+    draw.text((100, 1580), "ESCRIBINOS Y TE ASESORAMOS SIN COMPROMISO.", font=font_sub, fill=white)
+    draw.text((100, 1680), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", font=font_sub, fill=(180, 180, 200))
+    draw.text((100, 1720), "@CUANTICOPC", font=font_title, fill=cyan_neon)
 
     img.convert("RGB").save(output_path, quality=95)
     return output_path
-
 # ============================================================
 # SUBIDA TEMPORAL DE IMAGEN Y META / INSTAGRAM API
 # ============================================================
