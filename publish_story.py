@@ -892,20 +892,23 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
     bottom_img_top = 770
     paste_and_frame(img, bottom_img_url, (70, bottom_img_top, 1010, 1240))
 
-    # 3. Título "PCS GAMER" Centrado Verticalmente entre las fotos
+  # 3. Título "PCS GAMER" Centrado Verticalmente entre las fotos
     title_text = "PCS GAMER"
+    
+    # 1º Se mide el texto con textbbox (usa coordenadas 0, 0 para obtener ancho y alto)
     bbox = draw.textbbox((0, 0), title_text, font=font_title)
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
 
+    # 2º Se calculan tx y ty con las medidas obtenidas
     tx = (W - text_w) // 2
     ty = top_img_bottom + ((bottom_img_top - top_img_bottom - text_h) // 2) - bbox[1]
 
-    # Resplandor Neón Multicapa
+    # 3º Resplandor Neón Multicapa (Glow)
     glow_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow_layer)
     for _ in range(12):
-        gd.text((tx, ty), title_text, font=font_title, fill=pink_neon)
+        gd.text((tx, ty), title_text, font=font_title, fill=magenta_neon)
     glow_layer = glow_layer.filter(ImageFilter.GaussianBlur(22))
     
     glow_inner = Image.new("RGBA", (W, H), (0, 0, 0, 0))
@@ -917,9 +920,10 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
     img.alpha_composite(glow_layer)
     img.alpha_composite(glow_inner)
 
+    # 4º RECIÉN ACÁ se dibuja el texto en color rosa con tx y ty ya calculados
     draw = ImageDraw.Draw(img)
-    draw.text((tx, ty), title_text, font=font_title, fill=white)
-
+    draw.text((tx, ty), title_text, font=font_title, fill=pink_neon)
+    
     # Destellos Neón
     def draw_sparkle(d, cx, cy, size=26, color=white):
         d.polygon([(cx, cy - size), (cx + 5, cy - 5), (cx + size, cy), (cx + 5, cy + 5), 
