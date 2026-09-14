@@ -881,7 +881,7 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
         
         # Borde Neón Grueso (8px)
         d = ImageDraw.Draw(canvas)
-        d.rectangle([x1, y1, x2, y2], outline=cyan_neon, width=18)
+        d.rectangle([x1, y1, x2, y2], outline=cyan_magenta, width=18)
 
     # 1. Foto Superior (Se mantiene fija)
     top_img_bottom = 530
