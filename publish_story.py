@@ -1054,7 +1054,7 @@ def process_catalog(auto_approve=False):
                 weights=[0, 100, 0]
             )[0]
 
-if tipo_publicacion == "pcs_gamer":
+    if tipo_publicacion == "pcs_gamer":
                 print(f"[{index}/{total}] Generando placa especial: PCs Gamer")
                 # Llamado sin argumentos (las fotos se bajan solas por Unsplash)
                 image_path = generate_pcs_gamer_campaign()
