@@ -1326,11 +1326,11 @@ for index, product in enumerate(products, start=1):
                 delete_local_file(image_path)
                 time.sleep(10)
                 continue
-
+            
             if not bot:
                 print("TELEGRAM_BOT_TOKEN no configurado.")
                 delete_local_file(image_path)
-                continue
+                return
 
             markup = InlineKeyboardMarkup()
             markup.row(
