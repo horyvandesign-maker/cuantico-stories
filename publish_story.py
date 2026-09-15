@@ -1,5 +1,5 @@
 # ============================================================
-# 11/09 - Ajustes de espaciado y ancho de CTA
+# 1115 para cambiar que publica
 # ============================================================
 
 import os
@@ -12,7 +12,7 @@ import math
 import requests
 
 from io import BytesIO
-from PIL import Image, ImageFilter, ImageDraw, ImageFont
+from PIL import Image, ImageFilter, ImageDraw, ImageFont, ImageEnhance
 
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -774,13 +774,8 @@ def create_story_template(product, img_obj):
     return output_path
 
 # ============================================================
-# PLANTILLAS DE CAMPAÑA INSTITUCIONAL
+# PLANTILLAS DE CAMPAÑA INSTITUCIONAL Y BRANDING
 # ============================================================
-
-import os
-import requests
-from io import BytesIO
-from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 
 def get_google_font(font_name, size):
     fonts_dir = "fonts"
@@ -857,7 +852,6 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
     purple_glow = (180, 0, 255)
     white = (255, 255, 255)
 
-    # Tipografías
     font_title = get_google_font("BebasNeue", 140)
     font_body = get_google_font("Montserrat-Bold", 42)
     font_sub = get_google_font("Montserrat-SemiBold", 32)
@@ -880,31 +874,26 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
         processed_img = apply_gamer_filter(cropped)
         canvas.paste(processed_img, (x1, y1))
         
-        # Borde Neón Grueso (8px)
         d = ImageDraw.Draw(canvas)
-        d.rectangle([x1, y1, x2, y2], width=18)
+        d.rectangle([x1, y1, x2, y2], outline=cyan_neon, width=8)
 
-    # 1. Foto Superior (Se mantiene fija)
+    # 1. Foto Superior
     top_img_bottom = 530
     paste_and_frame(img, top_img_url, (70, 60, 1010, top_img_bottom))
 
-    # 2. Foto Inferior (Bajada a Y=770)
+    # 2. Foto Inferior
     bottom_img_top = 770
     paste_and_frame(img, bottom_img_url, (70, bottom_img_top, 1010, 1240))
 
-  # 3. Título "PCS GAMER" Centrado Verticalmente entre las fotos
+    # 3. Título "PCS GAMER" Centrado Verticalmente entre las fotos
     title_text = "PCS GAMER"
-    
-    # 1º Se mide el texto con textbbox (usa coordenadas 0, 0 para obtener ancho y alto)
     bbox = draw.textbbox((0, 0), title_text, font=font_title)
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
 
-    # 2º Se calculan tx y ty con las medidas obtenidas
     tx = (W - text_w) // 2
     ty = top_img_bottom + ((bottom_img_top - top_img_bottom - text_h) // 2) - bbox[1]
 
-    # 3º Resplandor Neón Multicapa (Glow)
     glow_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow_layer)
     for _ in range(12):
@@ -920,11 +909,9 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
     img.alpha_composite(glow_layer)
     img.alpha_composite(glow_inner)
 
-    # 4º RECIÉN ACÁ se dibuja el texto en color rosa con tx y ty ya calculados
     draw = ImageDraw.Draw(img)
     draw.text((tx, ty), title_text, font=font_title, fill=pink_neon)
     
-    # Destellos Neón
     def draw_sparkle(d, cx, cy, size=26, color=white):
         d.polygon([(cx, cy - size), (cx + 5, cy - 5), (cx + size, cy), (cx + 5, cy + 5), 
                    (cx, cy + size), (cx - 5, cy + 5), (cx - size, cy), (cx - 5, cy - 5)], fill=color)
@@ -933,7 +920,7 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
     draw_sparkle(draw, tx - 65, sparkle_y, size=28, color=white)
     draw_sparkle(draw, tx + text_w + 65, sparkle_y, size=26, color=cyan_neon)
 
-    # 4. Beneficios compactados
+    # 4. Beneficios
     benefits = [
         ("💳", "HASTA 12 CUOTAS CON TARJETAS"),
         ("📦", "ENVÍOS A TODO EL PAÍS"),
@@ -945,17 +932,11 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
     
     for i, (icon_symbol, text) in enumerate(benefits):
         y_pos = start_y + (i * step_y)
-        
-        # Insignia/Badge neón izquierda (28x28 px)
         draw.rounded_rectangle([70, y_pos + 8, 98, y_pos + 36], radius=5, fill=magenta_neon)
-        
-        # Punto blanco centrado dentro del badge (8x8 px)
         draw.ellipse([80, y_pos + 18, 88, y_pos + 26], fill=white)
-        
-        # Texto del beneficio
         draw.text((115, y_pos + 2), text, font=font_body, fill=white)
 
-    # 5. Llamados a la acción distribuidos al pie (Mismo tamaño de fuente)
+    # 5. Llamados a la acción
     draw.text((70, 1600), "ESCRIBINOS Y TE ASESORAMOS SIN COMPROMISO.", font=font_sub, fill=white)
     draw.text((70, 1750), "SEGUINOS PARA CONOCER NUESTRAS OFERTAS", font=font_sub, fill=(180, 180, 210))
     draw.text((70, 1800), "@CUANTICOPC", font=font_sub, fill=white)
@@ -963,8 +944,100 @@ def generate_pcs_gamer_campaign(output_path="pcs_gamer_story.jpg"):
     img.convert("RGB").save(output_path, quality=95)
     return output_path
 
-if __name__ == "__main__":
-    generate_pcs_gamer_campaign()
+def generate_branding_campaign(output_path="branding_story.jpg"):
+    W, H = 1080, 1920
+    bg_color = (6, 4, 14)
+    img = Image.new("RGBA", (W, H), bg_color)
+    draw = ImageDraw.Draw(img)
+
+    cyan_neon = (0, 245, 255)
+    magenta_neon = (255, 0, 150)
+    pink_neon = (255, 50, 180)
+    white = (255, 255, 255)
+
+    font_brand = get_google_font("BebasNeue", 150)
+    font_tagline = get_google_font("Montserrat-Bold", 34)
+    font_title_sec = get_google_font("BebasNeue", 80)
+    font_body = get_google_font("Montserrat-Bold", 38)
+    font_sub = get_google_font("Montserrat-SemiBold", 32)
+
+    hero_img_url = "https://images.unsplash.com/photo-1587202372775-e229f172b9d7?q=80&w=1000&auto=format&fit=crop"
+
+    def paste_and_frame(canvas, img_url, box, zoom=1.10):
+        x1, y1, x2, y2 = box
+        bw, bh = x2 - x1, y2 - y1
+        raw_img = fetch_stock_image(img_url, (bw, bh))
+        
+        iw, ih = raw_img.size
+        ratio = max(bw / iw, bh / ih) * zoom
+        resized = raw_img.resize((int(iw * ratio), int(ih * ratio)), Image.Resampling.LANCZOS)
+        
+        left = (resized.width - bw) // 2
+        top = (resized.height - bh) // 2
+        cropped = resized.crop((left, top, left + bw, top + bh))
+        
+        processed_img = apply_gamer_filter(cropped)
+        canvas.paste(processed_img, (x1, y1))
+        
+        d = ImageDraw.Draw(canvas)
+        d.rectangle([x1, y1, x2, y2], outline=cyan_neon, width=8)
+
+    # 1. Cabecera
+    brand_text = "CUANTICO PC"
+    bbox_b = draw.textbbox((0, 0), brand_text, font=font_brand)
+    bw_w = bbox_b[2] - bbox_b[0]
+    bx = (W - bw_w) // 2
+    by = 90
+
+    glow_brand = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    gd_b = ImageDraw.Draw(glow_brand)
+    for _ in range(12):
+        gd_b.text((bx, by), brand_text, font=font_brand, fill=magenta_neon)
+    glow_brand = glow_brand.filter(ImageFilter.GaussianBlur(25))
+    img.alpha_composite(glow_brand)
+
+    draw = ImageDraw.Draw(img)
+    draw.text((bx, by), brand_text, font=font_brand, fill=white)
+
+    # Tagline
+    tagline_text = "HARDWARE & GAMING DE ALTO RENDIMIENTO"
+    bbox_t = draw.textbbox((0, 0), tagline_text, font=font_tagline)
+    tx_pos = (W - (bbox_t[2] - bbox_t[0])) // 2
+    draw.text((tx_pos, 250), tagline_text, font=font_tagline, fill=cyan_neon)
+
+    # 2. Imagen Central
+    paste_and_frame(img, hero_img_url, (70, 320, 1010, 850))
+
+    # 3. Encabezado Servicios
+    sec_title = "TU PRÓXIMO NIVEL EMPIEZA ACÁ"
+    bbox_s = draw.textbbox((0, 0), sec_title, font=font_title_sec)
+    sx_pos = (W - (bbox_s[2] - bbox_s[0])) // 2
+    draw.text((sx_pos, 890), sec_title, font=font_title_sec, fill=pink_neon)
+
+    # 4. Pilares
+    pillars = [
+        "ARMADO DE PCS A MEDIDA Y ASESORAMIENTO",
+        "COMPONENTES 100% ORIGINALES Y GARANTÍA",
+        "ENVÍOS A TODO EL PAÍS CON SEGUIMIENTO",
+        "TODOS LOS MEDIOS DE PAGO Y CUOTAS"
+    ]
+
+    start_y = 1030
+    step_y = 90
+    for i, text in enumerate(pillars):
+        y_pos = start_y + (i * step_y)
+        draw.rounded_rectangle([70, y_pos + 6, 98, y_pos + 34], radius=5, fill=magenta_neon)
+        draw.ellipse([80, y_pos + 16, 88, y_pos + 24], fill=white)
+        draw.text((115, y_pos), text, font=font_body, fill=white)
+
+    # 5. Cierre
+    draw.text((70, 1470), "CONOCÉ NUESTRO CATÁLOGO COMPLETO", font=font_sub, fill=white)
+    draw.text((70, 1535), "ASESORATE POR PRIVADO CON NUESTROS ESPECIALISTAS", font=font_sub, fill=(180, 180, 210))
+    draw.text((70, 1600), "WWW.CUANTICOPC.COM.AR", font=font_sub, fill=pink_neon)
+    draw.text((70, 1665), "@CUANTICOPC", font=font_sub, fill=cyan_neon)
+
+    img.convert("RGB").save(output_path, quality=95)
+    return output_path
 
 # ============================================================
 # SUBIDA TEMPORAL DE IMAGEN Y META / INSTAGRAM API
@@ -1108,19 +1181,17 @@ def process_catalog(auto_approve=False):
     for index, product in enumerate(products, start=1):
         image_path = None
         try:
-            # PARA LA PRUEBA, PONÉ ESTO EN weights=[0, 100, 0]
-            # CUANDO TERMINES, VOLVELO A weights=[70, 15, 15]
+            # PESOS DE PRUEBA: Cambiar temporalmente a [0, 0, 100] para probar Branding.
+            # Para producción volver a: [70, 15, 15]
             tipo_publicacion = random.choices(
                 ["producto", "pcs_gamer", "branding"], 
-                weights=[0, 0, 100]
+                weights=[70, 15, 15]
             )[0]
 
             if tipo_publicacion == "pcs_gamer":
                 print(f"[{index}/{total}] Generando placa especial: PCs Gamer")
-                # Llamado sin argumentos (las fotos se bajan solas por Unsplash)
                 image_path = generate_pcs_gamer_campaign()
                 
-                # Inyectamos datos de apoyo
                 product["original_name"] = "Campaña Especial: PCs Gamer"
                 product["ai_name"] = "🔥 ARMAR TU PC SOÑADA"
                 product["is_on_demand"] = False
@@ -1131,7 +1202,6 @@ def process_catalog(auto_approve=False):
                 print(f"[{index}/{total}] Generando placa especial: Branding / Marca")
                 image_path = generate_branding_campaign()
                 
-                # Inyectamos datos de apoyo
                 product["original_name"] = "Campaña Institucional de Marca"
                 product["ai_name"] = "🚀 TU TECNOLOGÍA"
                 product["is_on_demand"] = False
@@ -1139,7 +1209,6 @@ def process_catalog(auto_approve=False):
                 product["permalink"] = SITE_URL
 
             else:
-                # Flujo normal de producto de WooCommerce
                 image_response = requests.get(product["raw_url"], headers=headers, timeout=20)
                 if image_response.status_code != 200:
                     print(f"[{index}/{total}] No se pudo descargar imagen.")
