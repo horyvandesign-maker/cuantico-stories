@@ -1202,13 +1202,23 @@ def process_catalog(auto_approve=False):
             # Para producción volver a: [70, 15, 15]
             tipo_publicacion = random.choices(
                 ["producto", "pcs_gamer", "branding"], 
-                weights=[0, 0, 100]
+                weights=[0, 100, 0]
             )[0]
 
             if tipo_publicacion == "pcs_gamer":
-                print(f"[{index}/{total}] Generando placa especial: PCs Gamer")
-                image_path = generate_pcs_gamer_campaign()
+                print(f"[{index}/{total}] Cargando imagen estática: campana_pcs_gamer.png")
                 
+                static_pcs_path = os.path.join(os.path.dirname(__file__), "campana_pcs_gamer.png")
+                
+                if not os.path.exists(static_pcs_path):
+                    print(f"⚠️ Error: No se encontró '{static_pcs_path}' en el repositorio.")
+                    continue
+
+                # Copia temporal para evitar que delete_local_file() borre tu archivo original
+                image_path = f"temp_pcs_gamer_{product['id']}.png"
+                img_static = Image.open(static_pcs_path)
+                img_static.save(image_path, "PNG")
+
                 product["original_name"] = "Campaña Especial: PCs Gamer"
                 product["ai_name"] = "🔥 ARMAR TU PC SOÑADA"
                 product["is_on_demand"] = False
