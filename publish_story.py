@@ -1195,26 +1195,23 @@ def process_catalog(auto_approve=False):
             parse_mode="HTML",
         )
 
-    for index, product in enumerate(products, start=1):
+for index, product in enumerate(products, start=1):
         image_path = None
         try:
-            # PESOS DE PRUEBA: Cambiar temporalmente a [0, 0, 100] para probar Branding.
-            # Para producción volver a: [70, 15, 15]
+            # Distribución sugerida: 70% Producto | 10% PCs Gamer | 10% Branding | 10% Notebooks
             tipo_publicacion = random.choices(
-                ["producto", "pcs_gamer", "branding"], 
-                weights=[0, 100, 0]
+                ["producto", "pcs_gamer", "branding", "notebooks"], 
+                weights=[0, 0, 0, 100]
             )[0]
 
             if tipo_publicacion == "pcs_gamer":
                 print(f"[{index}/{total}] Cargando imagen estática: campana_pcs_gamer.png")
                 
                 static_pcs_path = os.path.join(os.path.dirname(__file__), "campana_pcs_gamer.png")
-                
                 if not os.path.exists(static_pcs_path):
                     print(f"⚠️ Error: No se encontró '{static_pcs_path}' en el repositorio.")
                     continue
 
-                # Copia temporal para evitar que delete_local_file() borre tu archivo original
                 image_path = f"temp_pcs_gamer_{product['id']}.png"
                 img_static = Image.open(static_pcs_path)
                 img_static.save(image_path, "PNG")
@@ -1229,12 +1226,10 @@ def process_catalog(auto_approve=False):
                 print(f"[{index}/{total}] Cargando imagen estática: campana_marca.png")
                 
                 static_branding_path = os.path.join(os.path.dirname(__file__), "campana_marca.png")
-                
                 if not os.path.exists(static_branding_path):
                     print(f"⚠️ Error: No se encontró '{static_branding_path}' en el repositorio.")
                     continue
 
-                # Copia temporal para evitar que delete_local_file() borre tu archivo original
                 image_path = f"temp_branding_{product['id']}.png"
                 img_static = Image.open(static_branding_path)
                 img_static.save(image_path, "PNG")
@@ -1243,6 +1238,27 @@ def process_catalog(auto_approve=False):
                 product["ai_name"] = "🚀 CUANTICO PC"
                 product["is_on_demand"] = False
                 product["price"] = "TIENDA OFICIAL"
+                product["permalink"] = SITE_URL
+
+            # ============================================================
+            # NUEVA CAMPAÑA: NOTEBOOKS
+            # ============================================================
+            elif tipo_publicacion == "notebooks":
+                print(f"[{index}/{total}] Cargando imagen estática: campana_notebooks.png")
+                
+                static_notebooks_path = os.path.join(os.path.dirname(__file__), "campana_notebooks.png")
+                if not os.path.exists(static_notebooks_path):
+                    print(f"⚠️ Error: No se encontró '{static_notebooks_path}' en el repositorio.")
+                    continue
+
+                image_path = f"temp_notebooks_{product['id']}.png"
+                img_static = Image.open(static_notebooks_path)
+                img_static.save(image_path, "PNG")
+
+                product["original_name"] = "Campaña Especial: Notebooks"
+                product["ai_name"] = "💻 NOTEBOOKS GAMER & TRABAJO"
+                product["is_on_demand"] = False
+                product["price"] = "VER CATÁLOGO"
                 product["permalink"] = SITE_URL
 
             else:
