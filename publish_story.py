@@ -1201,7 +1201,7 @@ def process_catalog(auto_approve=False):
             # Distribución de frecuencia de campañas
             tipo_publicacion = random.choices(
                 ["producto", "pcs_gamer", "branding", "notebooks"], 
-                weights=[0, 0, 0, 100]
+                weights=[70, 10, 10, 10]
             )[0]
 
             if tipo_publicacion == "pcs_gamer":
