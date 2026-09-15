@@ -1195,13 +1195,13 @@ def process_catalog(auto_approve=False):
             parse_mode="HTML",
         )
 
-for index, product in enumerate(products, start=1):
+    for index, product in enumerate(products, start=1):
         image_path = None
         try:
-            # Distribución sugerida: 70% Producto | 10% PCs Gamer | 10% Branding | 10% Notebooks
+            # Distribución de frecuencia de campañas
             tipo_publicacion = random.choices(
                 ["producto", "pcs_gamer", "branding", "notebooks"], 
-                weights=[0, 0, 0, 100]
+                weights=[70, 10, 10, 10]
             )[0]
 
             if tipo_publicacion == "pcs_gamer":
@@ -1240,9 +1240,6 @@ for index, product in enumerate(products, start=1):
                 product["price"] = "TIENDA OFICIAL"
                 product["permalink"] = SITE_URL
 
-            # ============================================================
-            # NUEVA CAMPAÑA: NOTEBOOKS
-            # ============================================================
             elif tipo_publicacion == "notebooks":
                 print(f"[{index}/{total}] Cargando imagen estática: campana_notebooks.png")
                 
