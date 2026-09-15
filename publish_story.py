@@ -1216,11 +1216,21 @@ def process_catalog(auto_approve=False):
                 product["permalink"] = SITE_URL
 
             elif tipo_publicacion == "branding":
-                print(f"[{index}/{total}] Generando placa especial: Branding / Marca")
-                image_path = generate_branding_campaign()
+                print(f"[{index}/{total}] Cargando imagen estática: campana_marca.png")
                 
+                static_branding_path = os.path.join(os.path.dirname(__file__), "campana_marca.png")
+                
+                if not os.path.exists(static_branding_path):
+                    print(f"⚠️ Error: No se encontró '{static_branding_path}' en el repositorio.")
+                    continue
+
+                # Copia temporal para evitar que delete_local_file() borre tu archivo original
+                image_path = f"temp_branding_{product['id']}.png"
+                img_static = Image.open(static_branding_path)
+                img_static.save(image_path, "PNG")
+
                 product["original_name"] = "Campaña Institucional de Marca"
-                product["ai_name"] = "🚀 TU TECNOLOGÍA"
+                product["ai_name"] = "🚀 CUANTICO PC"
                 product["is_on_demand"] = False
                 product["price"] = "TIENDA OFICIAL"
                 product["permalink"] = SITE_URL
