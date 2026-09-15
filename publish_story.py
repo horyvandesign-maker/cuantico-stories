@@ -1330,7 +1330,7 @@ for index, product in enumerate(products, start=1):
             if not bot:
                 print("TELEGRAM_BOT_TOKEN no configurado.")
                 delete_local_file(image_path)
-                return
+                continue
 
             markup = InlineKeyboardMarkup()
             markup.row(
