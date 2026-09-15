@@ -1030,11 +1030,28 @@ def generate_branding_campaign(output_path="branding_story.jpg"):
         draw.ellipse([80, y_pos + 16, 88, y_pos + 24], fill=white)
         draw.text((115, y_pos), text, font=font_body, fill=white)
 
-    # 5. Cierre
+    # ============================================================
+    # 5. CIERRE (CON AJUSTE AUTOMÁTICO DE ANCHO DE TEXTO)
+    # ============================================================
+    
+    # Helper para reducir la fuente dinámicamente si se excede del margen derecho (max_w = 940px)
+    def fit_text_font(text, font_name, max_w=940, start_size=32):
+        size = start_size
+        f = get_google_font(font_name, size)
+        while draw.textbbox((0, 0), text, font=f)[2] > max_w and size > 14:
+            size -= 1
+            f = get_google_font(font_name, size)
+        return f
+
     draw.text((70, 1470), "CONOCÉ NUESTRO CATÁLOGO COMPLETO", font=font_sub, fill=white)
-    draw.text((70, 1535), "ASESORATE POR PRIVADO CON NUESTROS ESPECIALISTAS", font=font_sub, fill=(180, 180, 210))
-    draw.text((70, 1600), "WWW.CUANTICOPC.COM.AR", font=font_sub, fill=pink_neon)
-    draw.text((70, 1665), "@CUANTICOPC", font=font_sub, fill=cyan_neon)
+
+    # Texto con font ajustado automáticamente para que entre en la placa
+    text_asesoramiento = "ASESORATE POR PRIVADO CON NUESTROS ESPECIALISTAS"
+    font_fit_sub = fit_text_font(text_asesoramiento, "Montserrat-SemiBold", max_w=940, start_size=32)
+    draw.text((70, 1535), text_asesoramiento, font=font_fit_sub, fill=(180, 180, 210))
+
+    draw.text((70, 1750), "WWW.CUANTICOPC.COM.AR", font=font_sub, fill=pink_neon)
+    draw.text((70, 1800), "@CUANTICOPC", font=font_sub, fill=cyan_neon)
 
     img.convert("RGB").save(output_path, quality=95)
     return output_path
