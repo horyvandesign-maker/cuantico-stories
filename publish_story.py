@@ -1212,9 +1212,9 @@ def process_catalog(auto_approve=False):
                     print(f"⚠️ Error: No se encontró '{static_pcs_path}' en el repositorio.")
                     continue
 
-                image_path = f"temp_pcs_gamer_{product['id']}.png"
-                img_static = Image.open(static_pcs_path)
-                img_static.save(image_path, "PNG")
+                image_path = f"temp_pcs_gamer_{product['id']}.jpg"
+                img_static = Image.open(static_pcs_path).convert("RGB")
+                img_static.save(image_path, "JPEG", quality=95)
 
                 product["original_name"] = "Campaña Especial: PCs Gamer"
                 product["ai_name"] = "🔥 ARMAR TU PC SOÑADA"
@@ -1230,9 +1230,9 @@ def process_catalog(auto_approve=False):
                     print(f"⚠️ Error: No se encontró '{static_branding_path}' en el repositorio.")
                     continue
 
-                image_path = f"temp_branding_{product['id']}.png"
-                img_static = Image.open(static_branding_path)
-                img_static.save(image_path, "PNG")
+                image_path = f"temp_branding_{product['id']}.jpg"
+                img_static = Image.open(static_branding_path).convert("RGB")
+                img_static.save(image_path, "JPEG", quality=95)
 
                 product["original_name"] = "Campaña Institucional de Marca"
                 product["ai_name"] = "🚀 CUANTICO PC"
@@ -1248,16 +1248,15 @@ def process_catalog(auto_approve=False):
                     print(f"⚠️ Error: No se encontró '{static_notebooks_path}' en el repositorio.")
                     continue
 
-                image_path = f"temp_notebooks_{product['id']}.png"
-                img_static = Image.open(static_notebooks_path)
-                img_static.save(image_path, "PNG")
+                image_path = f"temp_notebooks_{product['id']}.jpg"
+                img_static = Image.open(static_notebooks_path).convert("RGB")
+                img_static.save(image_path, "JPEG", quality=95)
 
                 product["original_name"] = "Campaña Especial: Notebooks"
                 product["ai_name"] = "💻 NOTEBOOKS GAMER & TRABAJO"
                 product["is_on_demand"] = False
                 product["price"] = "VER CATÁLOGO"
                 product["permalink"] = SITE_URL
-
             else:
                 image_response = requests.get(product["raw_url"], headers=headers, timeout=20)
                 if image_response.status_code != 200:
