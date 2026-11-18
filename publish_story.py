@@ -1237,8 +1237,8 @@ def process_catalog(auto_approve=False):
         try:
             # Distribución de frecuencia de campañas
             tipo_publicacion = random.choices(
-                ["producto", "pcs_gamer", "branding", "notebooks"], 
-                weights=[70, 10, 10, 10]
+                ["producto", "pcs_gamer", "branding", "notebooks", "accesorios"],
+                weights=[65, 10, 10, 10, 5]
             )[0]
 
             if tipo_publicacion == "pcs_gamer":
@@ -1293,6 +1293,36 @@ def process_catalog(auto_approve=False):
                 product["ai_name"] = "💻 NOTEBOOKS GAMER & TRABAJO"
                 product["is_on_demand"] = False
                 product["price"] = "VER CATÁLOGO"
+                product["permalink"] = SITE_URL
+            
+            elif tipo_publicacion == "accesorios":
+                print(
+                    f"[{index}/{total}] "
+                    "Cargando imagen estática: campana_accesorios.png"
+                )
+
+                static_accesorios_path = os.path.join(
+                    os.path.dirname(__file__),
+                    "campana_accesorios.png"
+                )
+
+                if not os.path.exists(static_accesorios_path):
+                    print(
+                        f"⚠️ No se encontró "
+                        f"'{static_accesorios_path}'."
+                    )
+                    continue
+
+                image_path = f"temp_accesorios_{product['id']}.jpg"
+                img_static = Image.open(
+                    static_accesorios_path
+                ).convert("RGB")
+                img_static.save(image_path, "JPEG", quality=95)
+
+                product["original_name"] = "Campaña Especial: Accesorios"
+                product["ai_name"] = "🎧 ACCESORIOS Y MÁS"
+                product["is_on_demand"] = False
+                product["price"] = "VER OFERTAS"
                 product["permalink"] = SITE_URL
             else:
                 image_response = requests.get(product["raw_url"], headers=headers, timeout=20)
