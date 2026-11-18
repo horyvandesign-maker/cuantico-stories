@@ -1061,62 +1061,43 @@ def generate_branding_campaign(output_path="branding_story.jpg"):
 # ============================================================
 
 def upload_local_image_to_web(local_filepath):
-    if FREEIMAGE_API_KEY:
-        try:
-            with open(local_filepath, "rb") as file:
-                response = requests.post(
-                    "https://freeimage.host/api/1/upload",
-                    data={
-                        "key": FREEIMAGE_API_KEY,
-                        "action": "upload",
-                        "format": "json",
-                    },
-                    files={"source": file},
-                    timeout=30,
-                )
-
-            data = response.json()
-            image_data = data.get("image", {})
-
-            # display_url apunta al archivo JPG/PNG directo.
-            public_url = (
-                image_data.get("display_url")
-                or image_data.get("url")
-            )
-
-            if response.status_code == 200 and public_url:
-                print(f"Imagen subida a FreeImage: {public_url}")
-                return public_url
-
-            print(f"Respuesta no válida de FreeImage: {data}")
-
-        except Exception as error:
-            print(f"Error FreeImage: {error}")
+    if not FREEIMAGE_API_KEY:
+        print("❌ FREEIMAGE_API_KEY no está disponible.")
+        return None
 
     try:
         with open(local_filepath, "rb") as file:
             response = requests.post(
-                "https://tmpfiles.org/api/v1/upload",
-                files={"file": file},
+                "https://freeimage.host/api/1/upload",
+                data={
+                    "key": FREEIMAGE_API_KEY,
+                    "action": "upload",
+                    "format": "json",
+                },
+                files={"source": file},
                 timeout=30,
             )
 
         data = response.json()
+        image_data = data.get("image", {})
 
-        if "data" in data and "url" in data["data"]:
-            url = data["data"]["url"]
-            public_url = url.replace(
-                "tmpfiles.org/",
-                "tmpfiles.org/dl/"
-            )
-            print(f"Imagen subida a tmpfiles: {public_url}")
+        public_url = (
+            image_data.get("url")
+            or image_data.get("display_url")
+        )
+
+        if response.status_code == 200 and public_url:
+            public_url = public_url.replace("http://", "https://", 1)
+            print(f"Imagen subida a FreeImage: {public_url}")
             return public_url
 
+        print(f"❌ FreeImage rechazó la subida. HTTP {response.status_code}")
+        print(f"Detalle FreeImage: {data}")
+
     except Exception as error:
-        print(f"Error tmpfiles: {error}")
+        print(f"❌ Error FreeImage: {error}")
 
     return None
-
 
 def wait_for_container(container_id, timeout_seconds=60):
     status_url = f"https://graph.facebook.com/{META_API_VERSION}/{container_id}"
