@@ -1177,6 +1177,31 @@ def delete_local_file(path):
 # CICLO PRINCIPAL
 # ============================================================
 
+# ============================================================
+# CICLO PRINCIPAL
+# ============================================================
+
+def telegram_con_reintento_(accion, funcion, *args, intentos=3, **kwargs):
+    for intento in range(1, intentos + 1):
+        try:
+            return funcion(*args, **kwargs)
+
+        except Exception as error:
+            if intento == intentos:
+                print(
+                    f"⚠️ Telegram no respondió al {accion} "
+                    f"después de {intentos} intentos: {error}"
+                )
+                print("El proceso continuará sin esa notificación.")
+                return None
+
+            espera = 5 * intento
+            print(
+                f"⚠️ Error de Telegram al {accion}: {error}. "
+                f"Reintentando en {espera} segundos..."
+            )
+            time.sleep(espera)
+
 def process_catalog(auto_approve=False):
     products = fetch_all_catalog_products()
 
@@ -1189,11 +1214,13 @@ def process_catalog(auto_approve=False):
     total = len(products)
 
     if bot and TELEGRAM_CHAT_ID:
-        bot.send_message(
+        telegram_con_reintento_(
+            "enviar el aviso de inicio",
+            bot.send_message,
             TELEGRAM_CHAT_ID,
             "🚀 <b>Procesando diseño de Story...</b>",
             parse_mode="HTML",
-        )
+    )
 
     for index, product in enumerate(products, start=1):
         image_path = None
@@ -1397,6 +1424,7 @@ def process_catalog(auto_approve=False):
             print(f"Error procesando producto {product.get('id')}: {error}")
             delete_local_file(image_path)
             continue
+
 
 # ============================================================
 # MAIN
