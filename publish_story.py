@@ -1066,23 +1066,52 @@ def upload_local_image_to_web(local_filepath):
             with open(local_filepath, "rb") as file:
                 response = requests.post(
                     "https://freeimage.host/api/1/upload",
-                    data={"key": FREEIMAGE_API_KEY, "action": "upload", "format": "json"},
+                    data={
+                        "key": FREEIMAGE_API_KEY,
+                        "action": "upload",
+                        "format": "json",
+                    },
                     files={"source": file},
                     timeout=30,
                 )
+
             data = response.json()
-            if response.status_code == 200 and "image" in data and "url" in data["image"]:
-                return data["image"]["url"]
+            image_data = data.get("image", {})
+
+            # display_url apunta al archivo JPG/PNG directo.
+            public_url = (
+                image_data.get("display_url")
+                or image_data.get("url")
+            )
+
+            if response.status_code == 200 and public_url:
+                print(f"Imagen subida a FreeImage: {public_url}")
+                return public_url
+
+            print(f"Respuesta no válida de FreeImage: {data}")
+
         except Exception as error:
             print(f"Error FreeImage: {error}")
 
     try:
         with open(local_filepath, "rb") as file:
-            response = requests.post("https://tmpfiles.org/api/v1/upload", files={"file": file}, timeout=30)
+            response = requests.post(
+                "https://tmpfiles.org/api/v1/upload",
+                files={"file": file},
+                timeout=30,
+            )
+
         data = response.json()
+
         if "data" in data and "url" in data["data"]:
             url = data["data"]["url"]
-            return url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
+            public_url = url.replace(
+                "tmpfiles.org/",
+                "tmpfiles.org/dl/"
+            )
+            print(f"Imagen subida a tmpfiles: {public_url}")
+            return public_url
+
     except Exception as error:
         print(f"Error tmpfiles: {error}")
 
